@@ -48,6 +48,19 @@ impl AddAssign for Quantity {
     }
 }
 
+impl AddAssign<f64> for Quantity {
+    fn add_assign(&mut self, rhs: f64) {
+        self.0 += rhs
+    }
+}
+
+impl Mul<Quantity> for f64 {
+    type Output = Quantity;
+    fn mul(self, rhs: Quantity) -> Self::Output {
+        Quantity(self * rhs.0)
+    }
+}
+
 impl Mul<f64> for Quantity {
     type Output = Self;
     fn mul(self, rhs: f64) -> Self::Output {

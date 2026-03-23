@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["solver"]
+members = ["graph", "solver"]
 
 [workspace.package]
 version = "0.1.0"
@@ -12,3 +12,5 @@ version = "0.1.0"
 good_lp = { version = "=1.14", default-features = false }
 float_eq = { version = "1.0.1" }
 thiserror = { version = "2.0" }
+
+solver = { path = "./solver" }

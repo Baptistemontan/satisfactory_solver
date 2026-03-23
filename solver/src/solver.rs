@@ -7,7 +7,11 @@ use good_lp::{
     Expression, ProblemVariables, Solution as GLPSolution, Solver as LPSolver, SolverModel,
     Variable, constraint, variable, variables,
 };
-use std::{collections::BTreeMap, fmt::Debug};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    fmt::Debug,
+    rc::Rc,
+};
 
 #[derive(Clone)]
 pub struct Solver {
@@ -16,24 +20,24 @@ pub struct Solver {
     items_exprs: BTreeMap<ItemId, Expression>,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Target {
     pub iid: ItemId,
     pub qty: Option<Quantity>,
 }
 
-pub struct Solution<S> {
-    pub(crate) solution: S,
+pub type LPSolution<S> = <<S as LPSolver>::Model as SolverModel>::Solution;
+pub struct Solution<S: LPSolver> {
+    pub(crate) solution: LPSolution<S>,
     pub(crate) recipes_vars: BTreeMap<RecipeId, Variable>,
     pub(crate) input_vars: BTreeMap<ItemId, Variable>,
     pub(crate) sinks: BTreeMap<ItemId, Variable>,
 }
 
-type LPSolution<S> = <<S as LPSolver>::Model as SolverModel>::Solution;
-
-pub type SolutionResult<S> = Result<Solution<LPSolution<S>>, S>;
+pub type SolutionResult<S> = Result<Solution<S>, S>;
 
 impl Solver {
-    pub fn new(recipes: &BTreeMap<RecipeId, &Recipe>) -> Self {
+    pub fn new(recipes: &BTreeMap<RecipeId, Rc<Recipe>>) -> Self {
         let mut vars = variables!();
 
         let mut recipes_vars = BTreeMap::new();
@@ -55,7 +59,8 @@ impl Solver {
     fn solve<S: LPSolver>(
         self,
         solver: S,
-        target: Target,
+        maximize_target: Option<ItemId>,
+        constraints: &BTreeMap<ItemId, Quantity>,
         availables: &BTreeMap<ItemId, Quantity>,
     ) -> SolutionResult<S> {
         let Self {
@@ -81,21 +86,26 @@ impl Solver {
             *expr -= *sink;
         }
 
-        let Some(target_sink) = sinks.get(&target.iid) else {
-            todo!("no recipe for item {:?}", target.iid);
+        let mut problem = if let Some(target_id) = maximize_target {
+            let Some(target_sink) = sinks.get(&target_id) else {
+                todo!("no recipe for item {:?}", target_id);
+            };
+            vars.maximise(target_sink).using(solver)
+        } else {
+            let mut inputs_expr = Expression::from(0.0);
+            for input_var in input_vars.values() {
+                inputs_expr += input_var;
+            }
+            vars.minimise(inputs_expr).using(solver)
         };
 
-        let mut problem = match target.qty {
-            Some(qty) => {
-                let mut inputs_expr = Expression::from(0.0);
-                for input_var in input_vars.values() {
-                    inputs_expr += input_var;
-                }
-                let constraint = constraint!(*target_sink == qty);
-                vars.minimise(inputs_expr).using(solver).with(constraint)
-            }
-            None => vars.maximise(target_sink).using(solver),
-        };
+        for (iid, qty) in constraints {
+            let Some(sink) = sinks.get(iid) else {
+                todo!("no recipe for item {:?}", iid);
+            };
+            let constraint = constraint!(*sink == *qty);
+            problem = problem.with(constraint)
+        }
 
         for (_, expr) in items_exprs {
             problem = problem.with(expr.eq(0));
@@ -111,44 +121,40 @@ impl Solver {
         })
     }
 
-    pub fn maximise<S: LPSolver + Clone>(
+    pub fn optimize<S: LPSolver + Clone>(
         self,
         solver: S,
-        target: ItemId,
+        targets: &[Target],
         availables: &BTreeMap<ItemId, Quantity>,
     ) -> SolutionResult<S> {
-        let maximize_target = Target {
-            iid: target,
-            qty: None,
-        };
-        let maximized_solution = self
-            .clone()
-            .solve(solver.clone(), maximize_target, availables)?;
-        let Some(target_var) = maximized_solution.sinks.get(&target) else {
-            todo!("target var not found");
-        };
+        let mut set_targets = targets
+            .iter()
+            .filter_map(|target| Some((target.iid, target.qty?)))
+            .collect::<BTreeMap<ItemId, Quantity>>();
 
-        let max_production = maximized_solution.solution.value(*target_var);
+        let mut to_maximize = targets
+            .iter()
+            .filter(|target| target.qty.is_none())
+            .map(|target| target.iid)
+            .collect::<VecDeque<_>>();
 
-        self.optimize(solver, target, Quantity(max_production), availables)
-    }
+        while let Some(target) = to_maximize.pop_front() {
+            let solution =
+                self.clone()
+                    .solve(solver.clone(), Some(target), &set_targets, availables)?;
+            let Some(target_sink) = solution.sinks.get(&target) else {
+                todo!("target {:#?} sink not found", target);
+            };
+            let maximized = solution.solution.value(*target_sink);
+            let set_target = set_targets.entry(target).or_default();
+            *set_target += maximized;
+        }
 
-    pub fn optimize<S: LPSolver>(
-        self,
-        solver: S,
-        target: ItemId,
-        qty: impl Into<Quantity>,
-        availables: &BTreeMap<ItemId, Quantity>,
-    ) -> SolutionResult<S> {
-        let target = Target {
-            iid: target,
-            qty: Some(qty.into()),
-        };
-        self.solve(solver, target, availables)
+        self.solve(solver, None, &set_targets, availables)
     }
 }
 
-impl<S: GLPSolution> Solution<S> {
+impl<S: LPSolver> Solution<S> {
     pub fn get_inputs(&self) -> BTreeMap<ItemId, f64> {
         self.input_vars
             .iter()
@@ -183,7 +189,7 @@ impl<S: GLPSolution> Solution<S> {
     }
 }
 
-impl<S: GLPSolution> Debug for Solution<S> {
+impl<S: LPSolver> Debug for Solution<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "---Solution---")?;
         writeln!(f, "--- Inputs ---")?;

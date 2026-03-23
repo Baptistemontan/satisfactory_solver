@@ -14,6 +14,7 @@ pub struct RecipeId(pub usize);
 pub struct Recipe {
     pub inputs: BTreeMap<ItemId, Quantity>,
     pub outputs: BTreeMap<ItemId, Quantity>,
+    pub time: f64,
 }
 
 impl Recipe {
@@ -26,13 +27,15 @@ impl Recipe {
             let expr = items_exprs
                 .entry(*iid)
                 .or_insert_with(|| Expression::from(0.0));
-            *expr -= *qty * variable;
+            let per_min = (60. / self.time) * *qty;
+            *expr -= per_min * variable;
         }
         for (iid, qty) in &self.outputs {
             let expr = items_exprs
                 .entry(*iid)
                 .or_insert_with(|| Expression::from(0.0));
-            *expr += *qty * variable;
+            let per_min = (60. / self.time) * *qty;
+            *expr += per_min * variable;
         }
     }
 }
