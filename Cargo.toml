@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = ["solver"]
+
+[workspace.package]
+version = "0.1.0"
+
+[workspace.dependencies]
+# good_lp = { version = "1.14", default-features = false, features = [
+#     "clarabel",
+# ] }
+good_lp = { version = "=1.14", default-features = false }
+float_eq = { version = "1.0.1" }
+thiserror = { version = "2.0" }

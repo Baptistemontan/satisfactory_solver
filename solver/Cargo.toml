@@ -1,0 +1,19 @@
+[package]
+name = "solver"
+version = { workspace = true }
+edition = "2024"
+authors = ["Baptiste de Montangon"]
+license = "MIT"
+description = "Satisfactory recipe solver"
+readme = "../README.md"
+
+
+[dependencies]
+good_lp = { workspace = true }
+float_eq = { workspace = true }
+thiserror = { workspace = true }
+
+[features]
+default = ["microlp"]
+microlp = ["good_lp/microlp"]
+clarabel = ["good_lp/clarabel"]
