@@ -1,0 +1,37 @@
+name: Build and deploy gh page
+
+on:
+  push:
+    branches: ["master"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: set up trunk
+        uses: jetli/trunk-action@v0.5.0
+
+      - name: set up rust wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: build page
+        working-directory: frontend
+        run: trunk build --release
+
+      - name: upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist/
+
+      - name: deploy to gh-pages
+        id: deployment
+        uses: actions/deploy-pages@v4
