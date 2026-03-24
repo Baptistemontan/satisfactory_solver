@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt::Display, rc::Rc, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     BASE_URL,
@@ -8,7 +8,6 @@ use crate::{
 };
 use graph::{Edge, Graph as SolvedGraph};
 use leptos::{
-    either::{Either, EitherOf4},
     ev::{MouseEvent, WheelEvent},
     prelude::*,
 };
@@ -23,14 +22,14 @@ const MIN_NODE_HEIGHT: i32 = 100;
 const IO_CIRCLE_RADIUS: i32 = 16;
 const IO_IMAGE_SIZE: i32 = (IO_CIRCLE_RADIUS * 3) / 2;
 const POSITION_INCREMENT: f64 = 25.0;
+const TEXT_HEIGHT: i32 = 10;
 
 fn get_recipe(rid: RecipeId) -> Arc<Recipe> {
     let recipes = expect_context::<Recipes>();
-    let Some(recipe) = recipes.recipes.get(&rid) else {
+    let Some(recipe) = recipes.get(rid) else {
         todo!("recipe {:?} not found", rid);
     };
-
-    recipe.clone()
+    recipe
 }
 
 fn get_item(iid: ItemId) -> Arc<Item> {
@@ -175,7 +174,7 @@ fn sort_nodes(graph: &SolvedGraph) -> Arc<[Node]> {
         let level = levels.get(&node_id).unwrap();
         let y = &mut level_y[*level];
         let node_y = *y;
-        let node_x = 100.0 + ((NODE_WIDTH as f64) + POSITION_INCREMENT * 4.0) * (*level as f64);
+        let node_x = 100.0 + ((NODE_WIDTH as f64) + POSITION_INCREMENT * 5.0) * (*level as f64);
         let size = match node {
             graph::Node::Recipe { rid, .. } => {
                 let recipe = get_recipe(*rid);
@@ -429,8 +428,8 @@ fn render_node_inner(data: NodeData, size: i32) -> impl IntoView {
                 width=NODE_WIDTH
             />
             <image href=icon_href width=NODE_IMAGE_SIZE height=NODE_IMAGE_SIZE x=image_x y=image_y />
-            <foreignObject x=text_x y=text_y height=10 width=NODE_IMAGE_SIZE>
-                <div class="recipe-amount">
+            <foreignObject x=text_x y=text_y height=TEXT_HEIGHT width=NODE_IMAGE_SIZE>
+                <div class="amount recipe-amount">
                     <div>{amount}</div>
                 </div>
             </foreignObject>
@@ -470,13 +469,15 @@ fn render_io(
     let x = if input { 0 } else { NODE_WIDTH };
     let transform = format!("translate({}, {})", x, y);
     let amount = format_amount(amount);
+    let text_x = -IO_CIRCLE_RADIUS;
+    let text_y = (IO_CIRCLE_RADIUS * 3) / 4;
 
     view! {
         <g transform=transform class="node-io">
             <circle r=IO_CIRCLE_RADIUS/>
             <image href=icon_href width=IO_IMAGE_SIZE height=IO_IMAGE_SIZE y={IO_IMAGE_SIZE / -2} x={IO_IMAGE_SIZE / -2} />
-            <foreignObject y={(IO_CIRCLE_RADIUS * 3) / 4} x=-IO_CIRCLE_RADIUS width={IO_CIRCLE_RADIUS * 2} height=10>
-                <div class="io-amount">
+            <foreignObject x=text_x y=text_y width={IO_CIRCLE_RADIUS * 2} height=TEXT_HEIGHT>
+                <div class="amount io-amount">
                     <div>{amount}</div>
                 </div>
             </foreignObject>
@@ -534,10 +535,8 @@ fn render_edge(edge: Edge, nodes: Arc<[Node]>) -> impl IntoView {
 
     view! {
         <path
+            class="graph-edge"
             d=path
-            stroke="#90caf9"
-            stroke-width="1.0"
-            fill="none"
             marker-end="url(#arrow)"
         />
     }

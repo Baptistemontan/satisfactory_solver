@@ -31,13 +31,14 @@ foreignObject {
     background-position: center;
 }
 
-.io-amount {
+.amount {
     font-size: 8px;
     color: #f0f0f0;
     align-items: center;
     justify-content: center;
     text-shadow: 0 0 2px black, 0 0 2px black, 0 0 3px black, 0 0 3px black, 0 0 4px black, 0 0 4px black, 0 0 6px black;
 }
+
 .io-amount > div {
     text-align: center;
 }
@@ -51,4 +52,10 @@ foreignObject {
 }
 .recipe-amount > div {
     text-align: right;
+}
+
+.graph-edge {
+    stroke: #90caf9;
+    stroke-width: 1.0;
+    fill: none;
 }

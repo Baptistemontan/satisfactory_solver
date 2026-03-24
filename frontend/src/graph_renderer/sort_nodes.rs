@@ -3,9 +3,15 @@ use std::{
     mem,
 };
 
-use graph::{Graph, Node as GNode};
+use graph::{Edge, Graph, Node as GNode};
 
-fn cycle_removal(nodes: &[GNode], reverse_search: &mut BTreeMap<usize, Vec<usize>>) {
+fn cycle_removal(
+    nodes: &[GNode],
+    reverse_search: &mut BTreeMap<usize, BTreeSet<usize>>,
+) -> BTreeMap<usize, BTreeSet<usize>> {
+    // check for cycle and remove them
+    // DFS from an outpout
+    // if a node loopback to a parent node, remove that edge
     let outputs = nodes
         .iter()
         .enumerate()
@@ -16,6 +22,7 @@ fn cycle_removal(nodes: &[GNode], reverse_search: &mut BTreeMap<usize, Vec<usize
     let mut next_queue = VecDeque::new();
     let mut visited = BTreeSet::new();
     let mut visit_queue = Vec::new();
+    let mut cycles = BTreeMap::<usize, BTreeSet<usize>>::new();
     for out_node in outputs {
         next_queue.push_back(out_node);
         while !next_queue.is_empty() {
@@ -28,25 +35,36 @@ fn cycle_removal(nodes: &[GNode], reverse_search: &mut BTreeMap<usize, Vec<usize
                 let parent_queue = mem::take(parents);
                 visit_queue.push(node);
                 for parent in parent_queue {
-                    if !visited.contains(&parent) {
-                        parents.push(parent);
+                    if parent == node {
+                        // remove self loopback
+                        continue;
+                    } else if !visited.contains(&parent) {
+                        parents.insert(parent);
                         next_queue.push_back(parent);
+                    } else {
+                        cycles.entry(node).or_default().insert(parent);
                     }
                 }
             }
         }
         visited.clear();
     }
+
+    cycles
 }
 
+/// Analyze the graph and gives a "level" to each node to determine a flow direction
+/// inputs are at levels 0, recipes after that, and last outputs
+/// there might be some recipes with higher level than an output if multiple outputs are present
 pub fn sort_nodes(graph: &Graph) -> (BTreeMap<usize, usize>, usize) {
-    let mut reverse_search = BTreeMap::<usize, Vec<usize>>::new();
+    // precompute the parent of a node
+    let mut reverse_search = BTreeMap::<usize, BTreeSet<usize>>::new();
     for edge in graph.edges() {
         let parent = reverse_search.entry(edge.to).or_default();
-        parent.push(edge.from);
+        parent.insert(edge.from);
     }
-
-    cycle_removal(graph.nodes(), &mut reverse_search);
+    // remove edges that cause cycles
+    let cycles = cycle_removal(graph.nodes(), &mut reverse_search);
 
     let outputs = graph
         .nodes()
@@ -55,6 +73,7 @@ pub fn sort_nodes(graph: &Graph) -> (BTreeMap<usize, usize>, usize) {
         .filter(|(_, n)| matches!(n, GNode::Output { .. }))
         .map(|(n, _)| n);
 
+    // start with all inputs at level 0
     let mut levels = graph
         .nodes()
         .iter()
@@ -92,6 +111,8 @@ pub fn sort_nodes(graph: &Graph) -> (BTreeMap<usize, usize>, usize) {
         }
     }
 
+    // Give level to excess
+
     let excess_nodes = graph
         .nodes()
         .iter()
@@ -106,8 +127,64 @@ pub fn sort_nodes(graph: &Graph) -> (BTreeMap<usize, usize>, usize) {
             let level = levels.get(from_node).unwrap();
             max_level = max_level.max(*level);
         }
+        maximum_level = maximum_level.max(max_level + 1);
         levels.insert(excess, max_level + 1);
     }
 
+    // rearrange cycles
+
+    update_cycles_level(graph.edges(), &cycles, &mut levels);
+
+    // Remove empty levels
+
+    let mut level_count = vec![0; maximum_level + 1];
+    for level in levels.values() {
+        level_count[*level] += 1;
+    }
+    let empty_levels = level_count
+        .into_iter()
+        .enumerate()
+        .filter(|(_, c)| *c == 0)
+        .map(|(n, _)| n)
+        .collect::<Vec<_>>();
+    if !empty_levels.is_empty() {
+        for level in levels.values_mut() {
+            let diff = empty_levels.iter().take_while(|n| **n < *level).count();
+            *level -= diff;
+        }
+    }
+    maximum_level -= empty_levels.len();
+
     (levels, maximum_level)
+}
+
+// This is optional but produce better levels, it looks if a node that produced a cycle can be pushed up
+// it looks if its output and outputs that caused the cycles are the level just above
+fn update_cycles_level(
+    edges: &[Edge],
+    cycles: &BTreeMap<usize, BTreeSet<usize>>,
+    levels: &mut BTreeMap<usize, usize>,
+) {
+    if cycles.is_empty() {
+        return;
+    }
+    let mut cycle_edges = BTreeMap::<usize, BTreeSet<usize>>::new();
+    for edge in edges {
+        // skip if not a cycle
+        if cycles.contains_key(&edge.from) {
+            let childs = cycle_edges.entry(edge.from).or_default();
+            childs.insert(edge.to);
+        }
+    }
+    'outer: for (cycle_node, cycle_with) in cycles {
+        let current_level = levels[cycle_node];
+        let diff = cycle_edges.get(cycle_node).unwrap().difference(cycle_with);
+        for parent in diff {
+            let parent_level = levels.get(parent).unwrap();
+            if *parent_level <= current_level + 1 {
+                continue 'outer;
+            }
+        }
+        levels.insert(*cycle_node, current_level + 1);
+    }
 }
