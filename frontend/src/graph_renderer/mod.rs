@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, fmt::Display, rc::Rc, sync::Arc};
 
 use crate::{
+    BASE_URL,
     buildings::{Building, Buildings},
     item::{Item, Items},
     recipes::{Recipe, Recipes},
@@ -50,6 +51,10 @@ fn get_building(bid: BuildingId) -> Arc<Building> {
 
 #[derive(Clone, Copy, Debug)]
 struct NodeData(graph::Node);
+
+fn format_icon_href(icon: &str) -> String {
+    format!("{}assets/items/{}_256.png", BASE_URL, icon)
+}
 
 impl NodeData {
     pub fn to_key(self) -> (usize, usize) {
@@ -108,19 +113,21 @@ impl NodeData {
     }
 
     pub fn icon_href(self) -> String {
-        match self.0 {
+        let icon = match self.0 {
             graph::Node::Recipe { rid, .. } => {
                 let recipe = get_recipe(rid);
                 let building = get_building(recipe.inner.building);
-                format!("/assets/items/{}_256.png", building.icon)
+                building.icon.clone()
             }
             graph::Node::Excess { iid, .. }
             | graph::Node::Input { iid, .. }
             | graph::Node::Output { iid, .. } => {
                 let item = get_item(iid);
-                format!("/assets/items/{}_256.png", item.icon)
+                item.icon.clone()
             }
-        }
+        };
+
+        format_icon_href(&icon)
     }
 }
 
@@ -462,7 +469,7 @@ fn render_io(
     input: bool,
 ) -> impl IntoView {
     let item = get_item(iid);
-    let icon_href = format!("/assets/items/{}_256.png", item.icon);
+    let icon_href = format_icon_href(&item.icon);
     let y = compute_io_y_offset(idx, io_count, size);
     let x = if input { 0 } else { NODE_WIDTH };
     let transform = format!("translate({}, {})", x, y);

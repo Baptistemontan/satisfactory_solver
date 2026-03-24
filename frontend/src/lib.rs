@@ -19,6 +19,13 @@ use solver::{
 };
 
 const DATA: &str = include_str!("../../data/data.json");
+const DEFAULT_BASE_URL: &str = "/";
+pub const BASE_URL: &str = const {
+    match option_env!("SOLVER_APP_BASE_URL") {
+        Some(base_url) => base_url,
+        None => DEFAULT_BASE_URL,
+    }
+};
 
 #[component]
 pub fn App() -> impl IntoView {

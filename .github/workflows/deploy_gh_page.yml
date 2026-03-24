@@ -30,6 +30,8 @@ jobs:
       - name: build page
         working-directory: frontend
         run: trunk build --release --public-url /satisfactory_solver/
+        env:
+          SOLVER_APP_BASE_URL: "/satisfactory_solver/"
 
       - name: upload artifact
         uses: actions/upload-pages-artifact@v3
