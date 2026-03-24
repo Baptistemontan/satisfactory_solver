@@ -24,18 +24,13 @@ fn cycle_removal(nodes: &[GNode], reverse_search: &mut BTreeMap<usize, Vec<usize
             }
             mem::swap(&mut queue, &mut next_queue);
             while let Some(node) = queue.pop_front() {
-                leptos::logging::log!("check {}", node);
                 let parents = reverse_search.entry(node).or_default();
                 let parent_queue = mem::take(parents);
                 visit_queue.push(node);
                 for parent in parent_queue {
-                    leptos::logging::log!("parent: {}", parent);
                     if !visited.contains(&parent) {
-                        leptos::logging::log!("no cycle");
                         parents.push(parent);
                         next_queue.push_back(parent);
-                    } else {
-                        leptos::logging::log!("cycle");
                     }
                 }
             }
@@ -95,6 +90,23 @@ pub fn sort_nodes(graph: &Graph) -> (BTreeMap<usize, usize>, usize) {
                 levels.insert(node, max_level + 1);
             }
         }
+    }
+
+    let excess_nodes = graph
+        .nodes()
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| matches!(n, GNode::Excess { .. }))
+        .map(|(n, _)| n);
+
+    for excess in excess_nodes {
+        let from = reverse_search.get(&excess).unwrap();
+        let mut max_level = 0;
+        for from_node in from {
+            let level = levels.get(from_node).unwrap();
+            max_level = max_level.max(*level);
+        }
+        levels.insert(excess, max_level + 1);
     }
 
     (levels, maximum_level)
