@@ -11,6 +11,7 @@ use std::{
     collections::{BTreeMap, VecDeque},
     fmt::Debug,
     rc::Rc,
+    sync::Arc,
 };
 
 #[derive(Clone)]
@@ -37,7 +38,7 @@ pub struct Solution<S: LPSolver> {
 pub type SolutionResult<S> = Result<Solution<S>, S>;
 
 impl Solver {
-    pub fn new(recipes: &BTreeMap<RecipeId, Rc<Recipe>>) -> Self {
+    pub fn new(recipes: &BTreeMap<RecipeId, Arc<Recipe>>) -> Self {
         let mut vars = variables!();
 
         let mut recipes_vars = BTreeMap::new();

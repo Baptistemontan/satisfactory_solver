@@ -1,0 +1,54 @@
+g.graph-node {
+    cursor: grab;
+}
+
+g.graph-node-inner > rect {
+    rx: 8px;
+    ry: 8px;
+    fill: #1a1a1a;
+    stroke: #333333;
+    stroke-width: 2px;
+}
+
+g.graph-node:active {
+    cursor: grabbing;
+}
+
+g.node-io > circle {
+    fill: #1a1a1a;
+    stroke: #333333;
+    stroke-width: 2px;
+}
+
+g.node-io image {
+    width: 24px;
+    height: 24px;
+}
+
+foreignObject {
+    overflow: visible;
+    background-size: 200% 200%;
+    background-position: center;
+}
+
+.io-amount {
+    font-size: 8px;
+    color: #f0f0f0;
+    align-items: center;
+    justify-content: center;
+    text-shadow: 0 0 2px black, 0 0 2px black, 0 0 3px black, 0 0 3px black, 0 0 4px black, 0 0 4px black, 0 0 6px black;
+}
+.io-amount > div {
+    text-align: center;
+}
+
+.recipe-amount {
+    font-size: 8px;
+    color: #f0f0f0;
+    align-items: center;
+    justify-content: center;
+    text-shadow: 0 0 2px black, 0 0 2px black, 0 0 3px black, 0 0 3px black, 0 0 4px black, 0 0 4px black, 0 0 6px black;
+}
+.recipe-amount > div {
+    text-align: right;
+}

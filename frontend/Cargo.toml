@@ -1,0 +1,17 @@
+[package]
+name = "frontend"
+version = { workspace = true }
+edition = "2024"
+authors = ["Baptiste de Montangon"]
+license = "MIT"
+description = "Satisfactory recipe solver"
+readme = "../README.md"
+
+[dependencies]
+leptos = { workspace = true, features = ["csr"] }
+graph = { workspace = true }
+solver = { workspace = true }
+web-sys = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+console_error_panic_hook = { workspace = true }

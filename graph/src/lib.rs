@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, VecDeque, btree_map::Entry},
     fmt::Display,
     rc::Rc,
+    sync::Arc,
 };
 
 use float_eq::float_eq;
@@ -9,7 +10,7 @@ use good_lp::Solver as LPSolver;
 use solver::{
     quantity::Quantity,
     recipe::{ItemId, Recipe, RecipeId},
-    solver::{Solution, Solver},
+    solver::Solution,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -22,10 +23,10 @@ pub enum Node {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Edge {
-    from: usize,
-    to: usize,
-    iid: ItemId,
-    amount: f64,
+    pub from: usize,
+    pub to: usize,
+    pub iid: ItemId,
+    pub amount: f64,
 }
 
 #[derive(Debug)]
@@ -35,16 +36,13 @@ pub struct Graph {
 }
 
 fn build_graph<S: LPSolver>(
-    recipes: &BTreeMap<RecipeId, Rc<Recipe>>,
-    target: ItemId,
+    recipes: &BTreeMap<RecipeId, Arc<Recipe>>,
+    targets: &[ItemId],
     solution: &Solution<S>,
 ) -> Graph {
     let used_recipes = solution.get_recipes();
     let outputs = solution.get_outputs();
     let inputs = solution.get_inputs();
-    let Some(target_out_qty) = outputs.get(&target) else {
-        todo!("target {:#?} not found", target);
-    };
 
     let mut reverse_search_recipe = BTreeMap::<ItemId, Vec<RecipeId>>::new();
     for rid in used_recipes.keys() {
@@ -57,12 +55,19 @@ fn build_graph<S: LPSolver>(
     }
 
     let mut item_queue = VecDeque::new();
-    item_queue.push_back((target, 0usize, *target_out_qty));
 
-    let mut nodes = vec![Node::Output {
-        iid: target,
-        amount: *target_out_qty,
-    }];
+    let mut nodes = Vec::new();
+    for target in targets.iter() {
+        let Some(target_out_qty) = outputs.get(target) else {
+            todo!("target {:#?} not found", target);
+        };
+        item_queue.push_back((*target, nodes.len(), *target_out_qty));
+        nodes.push(Node::Output {
+            iid: *target,
+            amount: *target_out_qty,
+        });
+    }
+
     let mut edges = Vec::<Edge>::new();
     let mut spawned_recipes = BTreeMap::<RecipeId, usize>::new();
 
@@ -131,7 +136,7 @@ fn build_graph<S: LPSolver>(
 
 fn spawn_recipes(
     recipes_ids: &[RecipeId],
-    recipes: &BTreeMap<RecipeId, Rc<Recipe>>,
+    recipes: &BTreeMap<RecipeId, Arc<Recipe>>,
     used_recipes: &BTreeMap<RecipeId, f64>,
     nodes: &mut Vec<Node>,
     excess: &mut BTreeMap<ItemId, Vec<(usize, f64)>>,
@@ -271,6 +276,22 @@ fn to_dot(f: &mut std::fmt::Formatter<'_>, nodes: &[Node], edges: &[Edge]) -> st
 pub struct GraphToDot<'a>(&'a Graph);
 
 impl Graph {
+    pub fn build_from_solution<S: LPSolver>(
+        solution: &Solution<S>,
+        targets: &[ItemId],
+        recipes: &BTreeMap<RecipeId, Arc<Recipe>>,
+    ) -> Self {
+        build_graph(recipes, targets, solution)
+    }
+
+    pub fn nodes(&self) -> &[Node] {
+        &self.nodes
+    }
+
+    pub fn edges(&self) -> &[Edge] {
+        &self.edges
+    }
+
     pub fn to_dot(&self) -> GraphToDot<'_> {
         GraphToDot(self)
     }
@@ -284,8 +305,14 @@ impl Display for GraphToDot<'_> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
-    use solver::{SOLVER, solver::Target};
+    use solver::{
+        SOLVER,
+        recipe::BuildingId,
+        solver::{Solver, Target},
+    };
 
     #[test]
     fn test_maximize() {
@@ -297,12 +324,13 @@ mod tests {
         let w_id = ItemId(3);
         let iron_ingot_recipe_id = RecipeId(0);
         let iron_plate_recipe_id = RecipeId(1);
-        let iron_ingot_recipe = Rc::new(Recipe {
+        let iron_ingot_recipe = Arc::new(Recipe {
             inputs: BTreeMap::from([(iron_ore, Quantity(1.))]),
             outputs: BTreeMap::from([(iron_ingot, Quantity(1.))]),
             time: 2.,
+            building: BuildingId(0),
         });
-        let iron_plate_recipe = Rc::new(Recipe {
+        let iron_plate_recipe = Arc::new(Recipe {
             inputs: BTreeMap::from([(iron_ingot, Quantity(3.))]),
             outputs: BTreeMap::from([
                 (iron_plate, Quantity(2.)),
@@ -310,6 +338,7 @@ mod tests {
                 (w_id, Quantity(1.)),
             ]),
             time: 6.,
+            building: BuildingId(0),
         });
 
         let availables = BTreeMap::from([(iron_ore, Quantity(available_ores))]);
@@ -326,7 +355,7 @@ mod tests {
             .optimize(SOLVER, &[target], &availables)
             .unwrap();
 
-        let graph = build_graph(&recipes, target.iid, &solution);
+        let graph = build_graph(&recipes, &[target.iid], &solution);
 
         // println!("\n\n\n---Results---");
         // println!("{:#?}", graph.0);

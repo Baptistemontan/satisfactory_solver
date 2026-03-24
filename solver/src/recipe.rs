@@ -10,11 +10,15 @@ pub struct ItemId(pub usize);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct RecipeId(pub usize);
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct BuildingId(pub usize);
+
 #[derive(Debug, Clone)]
 pub struct Recipe {
     pub inputs: BTreeMap<ItemId, Quantity>,
     pub outputs: BTreeMap<ItemId, Quantity>,
     pub time: f64,
+    pub building: BuildingId,
 }
 
 impl Recipe {
