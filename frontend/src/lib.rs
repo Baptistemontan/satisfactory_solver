@@ -29,11 +29,7 @@ pub const BASE_URL: &str = const {
 
 #[component]
 pub fn App() -> impl IntoView {
-    // leptos::logging::log!("{:?}", DATA);
     let (recipes, items, buildings) = parser::parse(std::io::Cursor::new(DATA)).unwrap();
-
-    // leptos::logging::log!("{:#?}", recipes);
-    // leptos::logging::log!("{:#?}", items);
     let iron_plate_recipe_id = RecipeId(0);
     let iron_plate_item_id = ItemId(4);
     let plastic_item_id = ItemId(59);
@@ -59,17 +55,11 @@ pub fn App() -> impl IntoView {
         qty: None,
     };
 
-    leptos::logging::log!("start solve");
-
     let solution = Solver::new(&solver_recipes)
         .optimize(SOLVER, &[target], &availables)
         .unwrap();
 
-    leptos::logging::log!("finished solving");
-
     let graph = SolvedGraph::build_from_solution(&solution, &[target.iid], &solver_recipes);
-
-    leptos::logging::log!("finished constructiong graph");
 
     provide_context(recipes);
     provide_context(items);

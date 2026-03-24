@@ -167,8 +167,6 @@ impl NodeIter {
 fn sort_nodes(graph: &SolvedGraph) -> Arc<[Node]> {
     let (levels, max_level) = sort_nodes::sort_nodes(graph);
 
-    leptos::logging::log!("presolve finished");
-
     let mut level_y = vec![100.0; max_level + 1];
 
     let mut nodes = Vec::new();
@@ -206,9 +204,7 @@ fn snap_to_increment(x: f64) -> f64 {
 
 #[component]
 pub fn Graph(graph: SolvedGraph) -> impl IntoView {
-    leptos::logging::log!("rendering graph");
     let nodes = sort_nodes(&graph);
-    leptos::logging::log!("finished sorting nodes");
     let edges = graph
         .edges()
         .iter()

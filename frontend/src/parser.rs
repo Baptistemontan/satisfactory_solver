@@ -203,12 +203,6 @@ impl<'de> Visitor<'de> for ItemVisitor {
                 }
             }
         }
-        // while let Some(field) = map.next_key::<String>()? {
-        //     leptos::logging::log!("field: {:?}", field);
-        //     let v = map.next_value::<String>()?;
-
-        //     leptos::logging::log!("value: {:?}", v);
-        // }
 
         // TODO: don't unwrap here
         Ok(Item {
@@ -579,12 +573,6 @@ impl<'de> Visitor<'de> for BuildingVisitor {
                 }
             }
         }
-        // while let Some(field) = map.next_key::<String>()? {
-        //     leptos::logging::log!("field: {:?}", field);
-        //     let v = map.next_value::<String>()?;
-
-        //     leptos::logging::log!("value: {:?}", v);
-        // }
 
         // TODO: don't unwrap here
         Ok(Building {
