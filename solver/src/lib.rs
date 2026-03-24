@@ -23,7 +23,7 @@ mod tests {
     };
     use core::f64;
     use float_eq::assert_float_eq;
-    use std::{collections::BTreeMap, rc::Rc, sync::Arc};
+    use std::{collections::BTreeMap, sync::Arc};
 
     #[test]
     fn test_optimize() {

@@ -10,7 +10,6 @@ use good_lp::{
 use std::{
     collections::{BTreeMap, VecDeque},
     fmt::Debug,
-    rc::Rc,
     sync::Arc,
 };
 
