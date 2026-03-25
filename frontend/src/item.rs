@@ -53,7 +53,7 @@ pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -
                 .get(iid)
                 .is_some_and(|v| !matches!(v.get_untracked(), AmountState::None));
             // selected_items.insert(*iid, RwSignal::new(is_selected));
-            selected_items.insert(*iid, RwSignal::new(true));
+            selected_items.insert(*iid, RwSignal::new(is_selected));
         }
     }
     let selected_items = Arc::new(selected_items);
