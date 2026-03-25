@@ -112,7 +112,9 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
                 </ContentInner>
             }),
             INPUTS => EitherOf3::C(view! {
-                <InputTab available_items=available_items />
+                <ContentInner>
+                    <InputTab available_items=available_items />
+                </ContentInner>
             }),
             _ => unreachable!(),
         }

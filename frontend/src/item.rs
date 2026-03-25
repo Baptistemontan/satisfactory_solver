@@ -8,8 +8,9 @@ use solver::{quantity::Quantity, recipe::ItemId};
 use crate::{BASE_URL, utils::ArcIter};
 use leptos::{either::Either, prelude::*};
 use thaw::{
-    Button, ButtonAppearance, Checkbox, Divider, DrawerBody, DrawerHeader, DrawerHeaderTitle,
-    DrawerHeaderTitleAction, Input, OverlayDrawer, SpinButton, Tooltip,
+    BackTop, Button, ButtonAppearance, Checkbox, Divider, DrawerBody, DrawerHeader,
+    DrawerHeaderTitle, DrawerHeaderTitleAction, DrawerSize, Input, OverlayDrawer, Scrollbar,
+    SpinButton, Switch, Tooltip,
 };
 
 #[derive(Debug)]
@@ -51,7 +52,8 @@ pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -
             let is_selected = available_items
                 .get(iid)
                 .is_some_and(|v| !matches!(v.get_untracked(), AmountState::None));
-            selected_items.insert(*iid, RwSignal::new(is_selected));
+            // selected_items.insert(*iid, RwSignal::new(is_selected));
+            selected_items.insert(*iid, RwSignal::new(true));
         }
     }
     let selected_items = Arc::new(selected_items);
@@ -127,19 +129,34 @@ pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -
         }
     };
 
+    let input_selection = RwSignal::new(false);
+
     view! {
         <div class="input-items-selection">
-            <div class="input-ressources-selection">
-                <div class="input-ressources-selection-header">
-                    <span>"Ressources"</span>
-                    <div class="input-ressources-selection-toggles">
-                        <Button on_click=set_ressources_to_zero>"Set to 0"</Button>
-                        <Button on_click=set_ressources_to_max>"Set to max"</Button>
-                    </div>
-                </div>
-                <Divider />
-                <ItemsAmountInput item_selection=ressources />
-            </div>
+            {
+                let selected_items = selected_items.clone();
+                move || {
+                    if input_selection.get() {
+                        Either::Left(view! {
+                            <ItemList selected_items={selected_items.clone()}/>
+                        })
+                    } else {
+                        Either::Right(view! {
+                            <div class="input-ressources-selection">
+                                <div class="input-ressources-selection-header">
+                                    <span>"Ressources"</span>
+                                    <div class="input-ressources-selection-toggles">
+                                        <Button on_click=set_ressources_to_zero>"Set to 0"</Button>
+                                        <Button on_click={set_ressources_to_max.clone()}>"Set to max"</Button>
+                                    </div>
+                                </div>
+                                <Divider />
+                                <ItemsAmountInput item_selection=ressources />
+                            </div>
+                        })
+                    }
+                }
+            }
             <div class="input-selection-divider">
                 <Divider vertical=true />
             </div>
@@ -147,7 +164,8 @@ pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -
                 <div class="input-ressources-selection-header">
                     <span>"Inputs"</span>
                     <div class="input-ressources-selection-toggles">
-                        <ItemSelector selected_items={selected_items.clone()} />
+                        // <ItemSelector selected_items={selected_items.clone()} />
+                        <Switch checked=input_selection label="Edit Inputs"  />
                     </div>
                 </div>
                 <Divider />
@@ -157,33 +175,33 @@ pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -
     }
 }
 
-#[component]
-pub fn ItemSelector(selected_items: Arc<BTreeMap<ItemId, RwSignal<bool>>>) -> impl IntoView {
-    let drawer_open = RwSignal::new(false);
-    let on_open = move |_| drawer_open.set(true);
-    let on_close = move |_| drawer_open.set(false);
-    view! {
-        <Button on_click=on_open>"Edit Inputs"</Button>
-        <OverlayDrawer open=drawer_open>
-            <DrawerHeader>
-            <DrawerHeaderTitle>
-                <DrawerHeaderTitleAction slot>
-                    <Button
-                        appearance=ButtonAppearance::Subtle
-                        on_click=on_close
-                    >
-                        "x"
-                    </Button>
-                </DrawerHeaderTitleAction>
-                "Toggle Item"
-            </DrawerHeaderTitle>
-            </DrawerHeader>
-            <DrawerBody>
-                <ItemList selected_items=selected_items/>
-            </DrawerBody>
-        </OverlayDrawer>
-    }
-}
+// #[component]
+// pub fn ItemSelector(selected_items: Arc<BTreeMap<ItemId, RwSignal<bool>>>) -> impl IntoView {
+//     let drawer_open = RwSignal::new(false);
+//     let on_open = move |_| drawer_open.set(true);
+//     let on_close = move |_| drawer_open.set(false);
+//     view! {
+//         <Button on_click=on_open>"Edit Inputs"</Button>
+//         <OverlayDrawer open=drawer_open size=DrawerSize::Medium>
+//             <DrawerHeader>
+//             <DrawerHeaderTitle>
+//                 <DrawerHeaderTitleAction slot>
+//                     <Button
+//                         appearance=ButtonAppearance::Subtle
+//                         on_click=on_close
+//                     >
+//                         "x"
+//                     </Button>
+//                 </DrawerHeaderTitleAction>
+//                 "Toggle Item"
+//             </DrawerHeaderTitle>
+//             </DrawerHeader>
+//             <DrawerBody>
+//                 <ItemList selected_items=selected_items/>
+//             </DrawerBody>
+//         </OverlayDrawer>
+//     }
+// }
 
 #[component]
 fn ItemList(selected_items: Arc<BTreeMap<ItemId, RwSignal<bool>>>) -> impl IntoView {
@@ -220,18 +238,26 @@ fn ItemList(selected_items: Arc<BTreeMap<ItemId, RwSignal<bool>>>) -> impl IntoV
     });
 
     view! {
-        <div>
-            <Input value=search_value placeholder="search" />
-            <For
-                each = move || items_to_display.get()
-                key = |a| a.0
-                let((iid, toggle))
-            >
-                <DisplayItem
-                    item_id = iid
-                    selected = toggle
-                />
-            </For>
+        <div class="item-picking-list">
+            <div class="item-list-header">
+                <Input value=search_value placeholder="search" />
+            </div>
+            <Divider />
+            <Scrollbar>
+                <div class="item-list-toggles">
+                    <For
+                        each = move || items_to_display.get()
+                        key = |a| a.0
+                        let((iid, toggle))
+                    >
+                        <DisplayItem
+                            item_id = iid
+                            selected = toggle
+                        />
+                    </For>
+                </div>
+                <BackTop/>
+            </Scrollbar>
         </div>
     }
 }
@@ -262,20 +288,23 @@ pub fn ItemsAmountInput(
     #[prop(default = false)] maximize: bool,
 ) -> impl IntoView {
     view! {
-        <div class="items-amount-inputs">
-            <For
-                each = move || item_selection.get()
-                key = |a| a.0
-                let((iid, amount))
-            >
-                <ItemAmountInput
-                    item_id = iid
-                    amount = amount
-                    selected={selected.clone()}
-                    maximize=maximize
-                />
-            </For>
-        </div>
+        <Scrollbar>
+            <div class="items-amount-inputs">
+                <For
+                    each = move || item_selection.get()
+                    key = |a| a.0
+                    let((iid, amount))
+                >
+                    <ItemAmountInput
+                        item_id = iid
+                        amount = amount
+                        selected={selected.clone()}
+                        maximize=maximize
+                    />
+                </For>
+            </div>
+            <BackTop />
+        </Scrollbar>
     }
 }
 

@@ -113,22 +113,33 @@ pub fn sort_nodes(graph: &Graph) -> (BTreeMap<usize, usize>, usize) {
 
     // Give level to excess
 
-    let excess_nodes = graph
+    let mut excess_nodes = graph
         .nodes()
         .iter()
         .enumerate()
         .filter(|(_, n)| matches!(n, GNode::Excess { .. }))
-        .map(|(n, _)| n);
+        .map(|(n, _)| n)
+        .peekable();
+
+    if excess_nodes.peek().is_some() {
+        maximum_level += 1;
+    }
 
     for excess in excess_nodes {
-        let from = reverse_search.get(&excess).unwrap();
-        let mut max_level = 0;
-        for from_node in from {
-            let level = levels.get(from_node).unwrap();
-            max_level = max_level.max(*level);
-        }
-        maximum_level = maximum_level.max(max_level + 1);
-        levels.insert(excess, max_level + 1);
+        levels.insert(excess, maximum_level);
+    }
+
+    // set all outputs to max_level
+
+    let output_nodes = graph
+        .nodes()
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| matches!(n, GNode::Output { .. }))
+        .map(|(n, _)| n);
+
+    for out in output_nodes {
+        levels.insert(out, maximum_level);
     }
 
     // rearrange cycles
