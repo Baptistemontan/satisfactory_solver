@@ -40,6 +40,9 @@ pub struct Items {
     pub items: Arc<BTreeMap<ItemId, Arc<Item>>>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct RessourcesResetProvider(ReadSignal<Option<bool>>);
+
 #[component]
 pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -> impl IntoView {
     let items = expect_context::<Items>();
@@ -89,47 +92,19 @@ pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -
         }
     });
 
+    let reset_signal = RwSignal::new(None);
+
     let set_ressources_to_zero = move |_| {
-        let rs = ressources.read();
-        for (_, amount) in &*rs {
-            amount.update(|current| match current {
-                AmountState::None
-                | AmountState::Some(_)
-                | AmountState::EnabledZero
-                | AmountState::Maximize(_) => {
-                    *current = AmountState::EnabledZero;
-                }
-                AmountState::Disabled(_)
-                | AmountState::DisabledZero
-                | AmountState::MaximizeDisabled(_) => {
-                    *current = AmountState::DisabledZero;
-                }
-            });
-        }
+        reset_signal.set(Some(false));
     };
 
     let set_ressources_to_max = move |_| {
-        let rs = ressources.read();
-        for (iid, amount) in &*rs {
-            let item = items.items.get(iid).unwrap();
-            let qty = item.ressource.unwrap();
-            amount.update(|current| match current {
-                AmountState::None
-                | AmountState::Some(_)
-                | AmountState::EnabledZero
-                | AmountState::Maximize(_) => {
-                    *current = AmountState::Some(qty);
-                }
-                AmountState::Disabled(_)
-                | AmountState::DisabledZero
-                | AmountState::MaximizeDisabled(_) => {
-                    *current = AmountState::Disabled(qty);
-                }
-            });
-        }
+        reset_signal.set(Some(true));
     };
 
     let input_selection = RwSignal::new(false);
+
+    provide_context(RessourcesResetProvider(reset_signal.read_only()));
 
     view! {
         <div class="input-items-selection">
@@ -147,7 +122,7 @@ pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -
                                     <span>"Ressources"</span>
                                     <div class="input-ressources-selection-toggles">
                                         <Button on_click=set_ressources_to_zero>"Set to 0"</Button>
-                                        <Button on_click={set_ressources_to_max.clone()}>"Set to max"</Button>
+                                        <Button on_click=set_ressources_to_max>"Set to max"</Button>
                                     </div>
                                 </div>
                                 <Divider />
@@ -370,10 +345,12 @@ fn ItemAmountInput(
     selected: Option<Arc<BTreeMap<ItemId, RwSignal<bool>>>>,
     maximize: bool,
 ) -> impl IntoView {
+    let reset_ressources_sig = use_context::<RessourcesResetProvider>();
     let items = expect_context::<Items>();
     let item = items.items.get(&item_id).unwrap();
     let name = item.name.clone();
     let icon_href = format_icon_href(&item.icon);
+    let ressource_amout = item.ressource;
     let (current_value, activated, currently_maximized) = match amount.get_untracked() {
         AmountState::None | AmountState::EnabledZero => (0.0, true, false),
         AmountState::Some(qty) => (qty, true, false),
@@ -405,6 +382,19 @@ fn ItemAmountInput(
             <Tooltip content="Maximize" >
                 <Checkbox checked=maximize_status/>
             </Tooltip>
+        }
+    });
+
+    Effect::new(move || {
+        if let Some((RessourcesResetProvider(sig), amount)) =
+            reset_ressources_sig.zip(ressource_amout)
+        {
+            let new_value = match sig.get() {
+                Some(true) => amount,
+                Some(false) => 0.0,
+                None => return,
+            };
+            current_value.set(new_value);
         }
     });
 
