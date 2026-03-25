@@ -115,9 +115,25 @@ body {
     margin-right: 20px;
     margin-left: 20px;
     display: flex;
-    float: left;
     max-width: 1500px;
     width: 100%;
+}
+
+.recipe-list-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.recipe-list-toggles {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.recipe-list-toggle {
+    margin-left: 5px;
+    margin-right: 5px;
 }
 
 .recipes-divider {

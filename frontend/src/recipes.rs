@@ -9,7 +9,7 @@ use solver::{
 };
 
 use leptos::prelude::*;
-use thaw::{BackTop, Checkbox, Divider, Input, Scrollbar, Tooltip};
+use thaw::{BackTop, Button, Checkbox, Divider, Input, Scrollbar, Tooltip};
 
 use crate::{
     BASE_URL,
@@ -56,9 +56,7 @@ impl Recipes {
 }
 
 #[component]
-pub fn RecipeTab(
-    selected_recipes: RwSignal<BTreeMap<RecipeId, Arc<SolverRecipe>>>,
-) -> impl IntoView {
+pub fn RecipeTab(selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>) -> impl IntoView {
     let recipes = expect_context::<Recipes>();
 
     let alternate_recipes = recipes
@@ -79,13 +77,13 @@ pub fn RecipeTab(
         <Scrollbar>
             <div class="recipes">
                 <div class="base-recipes">
-                    <RecipeList recipes=base_recipes selected_recipes=selected_recipes />
+                    <RecipeList recipes={Arc::new(base_recipes)} selected_recipes={selected_recipes.clone()} />
                 </div>
                 <div class="recipes-divider">
                     <Divider vertical=true />
                 </div>
                 <div class="alternate-recipes">
-                    <RecipeList recipes=alternate_recipes selected_recipes=selected_recipes />
+                    <RecipeList recipes={Arc::new(alternate_recipes)} selected_recipes=selected_recipes />
                 </div>
             </div>
             <BackTop />
@@ -94,17 +92,17 @@ pub fn RecipeTab(
 }
 #[component]
 pub fn RecipeList(
-    selected_recipes: RwSignal<BTreeMap<RecipeId, Arc<SolverRecipe>>>,
-    recipes: BTreeMap<RecipeId, Arc<Recipe>>,
+    selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>,
+    recipes: Arc<BTreeMap<RecipeId, Arc<Recipe>>>,
 ) -> impl IntoView {
     let search_value = RwSignal::new(String::new());
-    let recipes_to_display = RwSignal::new(Default::default());
+    let recipes_to_display: RwSignal<BTreeMap<_, _>> = RwSignal::new(Default::default());
     let mut search_helper = recipes
         .iter()
         .map(|(rid, r)| (r.name.to_lowercase(), BTreeSet::from([*rid])))
         .collect::<HashMap<String, BTreeSet<RecipeId>>>();
     let items = expect_context::<Items>();
-    for (rid, recipe) in &recipes {
+    for (rid, recipe) in &*recipes {
         let io = recipe.inputs().keys().chain(recipe.outputs().keys());
         for iid in io {
             let item = items.items.get(iid).unwrap();
@@ -115,10 +113,32 @@ pub fn RecipeList(
         }
     }
 
+    let on_toggle_all = {
+        let recipes = recipes.clone();
+        let selected_recipes = selected_recipes.clone();
+        move |_| {
+            for rid in recipes.keys() {
+                let recipe_toggle = selected_recipes.get(rid).unwrap();
+                recipe_toggle.set(true);
+            }
+        }
+    };
+
+    let on_toggle_none = {
+        let recipes = recipes.clone();
+        let selected_recipes = selected_recipes.clone();
+        move |_| {
+            for rid in recipes.keys() {
+                let recipe_toggle = selected_recipes.get(rid).unwrap();
+                recipe_toggle.set(false);
+            }
+        }
+    };
+
     Effect::new(move |_| {
         let searched = search_value.read().to_lowercase();
         if searched.is_empty() {
-            recipes_to_display.set(recipes.clone());
+            recipes_to_display.set(BTreeMap::clone(&recipes));
             return;
         }
 
@@ -138,15 +158,25 @@ pub fn RecipeList(
 
     view! {
         <div class="recipe-list">
-            <Input value=search_value placeholder="search" />
+            <div class="recipe-list-header">
+                <Input value=search_value placeholder="search" />
+                <div class="recipe-list-toggles">
+                    <div class="recipe-list-toggle">
+                        <Button on_click=on_toggle_all>"All"</Button>
+                    </div>
+                    <div class="recipe-list-toggle">
+                        <Button on_click=on_toggle_none>"None"</Button>
+                    </div>
+                </div>
+            </div>
             <For
-                each= move || recipes_to_display.get().clone()
-                key=|a| a.0
+                each = move || recipes_to_display.get().clone()
+                key = |a| a.0
                 let((rid, recipe))
             >
                 <RecipePicker
                     rid=rid
-                    selected_recipes=selected_recipes
+                    selected_recipes={selected_recipes.clone()}
                     recipe=recipe
                     items={items.clone()}
                 />
@@ -157,29 +187,15 @@ pub fn RecipeList(
 
 #[component]
 pub fn RecipePicker(
-    selected_recipes: RwSignal<BTreeMap<RecipeId, Arc<SolverRecipe>>>,
+    selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>,
     rid: RecipeId,
     recipe: Arc<Recipe>,
     items: Items,
 ) -> impl IntoView {
-    let is_selected = selected_recipes.with_untracked(|sr| sr.contains_key(&rid));
-    let selected = RwSignal::new(is_selected);
-    let effect_recipe = recipe.clone();
+    let selected = *selected_recipes.get(&rid).unwrap();
 
     let inputs = display_io(&items, recipe.inputs());
     let outputs = display_io(&items, recipe.outputs());
-
-    Effect::new(move |_| {
-        if selected.get() {
-            let mut sr = selected_recipes.write();
-            let sr = &mut *sr;
-            sr.insert(rid, effect_recipe.inner.clone());
-        } else {
-            let mut sr = selected_recipes.write();
-            let sr = &mut *sr;
-            sr.remove(&rid);
-        }
-    });
 
     view! {
         <div class="recipe-picker">

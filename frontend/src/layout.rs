@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use crate::recipes::RecipeTab;
 use crate::{graph_renderer::component::GraphVisualizer, recipes::Recipes};
@@ -56,9 +57,15 @@ pub fn Header(selected_tab: RwSignal<String>, theme: RwSignal<Theme>) -> impl In
 #[component]
 pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
     let recipes = expect_context::<Recipes>();
-    let selected_recipes = RwSignal::new(recipes.default_selected_recipes());
+    let selected_recipes = recipes
+        .recipes
+        .keys()
+        .map(|rid| (*rid, RwSignal::new(true)))
+        .collect::<BTreeMap<_, _>>();
+    let selected_recipes = Arc::new(selected_recipes);
     move || {
         let tab = selected_tab.get();
+        let selected_recipes = selected_recipes.clone();
         match tab.as_str() {
             PRODUCTION => Either::Left(view! {
                 <ContentInner>

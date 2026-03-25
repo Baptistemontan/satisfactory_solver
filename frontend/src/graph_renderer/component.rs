@@ -16,10 +16,9 @@ use graph::Graph as SolvedGraph;
 use crate::{graph_renderer::SerializableGraph, parser, recipes::Recipes};
 
 #[component]
-pub fn GraphVisualizer(
-    selected_recipes: RwSignal<BTreeMap<RecipeId, Arc<SolverRecipe>>>,
-) -> impl IntoView {
+pub fn GraphVisualizer(selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>) -> impl IntoView {
     let recipes = expect_context::<Recipes>();
+
     let iron_plate_recipe_id = RecipeId(0);
     let iron_plate_item_id = ItemId(4);
     let plastic_item_id = ItemId(59);
@@ -40,7 +39,13 @@ pub fn GraphVisualizer(
     };
 
     let graph = Memo::new(move |_| {
-        let solver_recipes = selected_recipes.read();
+        let mut solver_recipes = BTreeMap::new();
+        for (rid, selected) in &*selected_recipes {
+            if selected.get() {
+                let r = recipes.get(*rid).unwrap();
+                solver_recipes.insert(*rid, r.inner.clone());
+            }
+        }
 
         let solution = Solver::new(&solver_recipes)
             .optimize(SOLVER, &[target], &availables)
