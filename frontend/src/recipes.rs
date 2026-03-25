@@ -74,20 +74,17 @@ pub fn RecipeTab(selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>) -> i
         .collect::<BTreeMap<RecipeId, Arc<Recipe>>>();
 
     view! {
-        <Scrollbar>
-            <div class="recipes">
-                <div class="base-recipes">
-                    <RecipeList recipes={Arc::new(base_recipes)} selected_recipes={selected_recipes.clone()} />
-                </div>
-                <div class="recipes-divider">
-                    <Divider vertical=true />
-                </div>
-                <div class="alternate-recipes">
-                    <RecipeList recipes={Arc::new(alternate_recipes)} selected_recipes=selected_recipes />
-                </div>
+        <div class="recipes">
+            <div class="base-recipes">
+                <RecipeList recipes={Arc::new(base_recipes)} selected_recipes={selected_recipes.clone()} />
             </div>
-            <BackTop />
-        </Scrollbar>
+            <div class="recipes-divider">
+                <Divider vertical=true />
+            </div>
+            <div class="alternate-recipes">
+                <RecipeList recipes={Arc::new(alternate_recipes)} selected_recipes=selected_recipes />
+            </div>
+        </div>
     }
 }
 #[component]
@@ -169,18 +166,24 @@ pub fn RecipeList(
                     </div>
                 </div>
             </div>
-            <For
-                each = move || recipes_to_display.get().clone()
-                key = |a| a.0
-                let((rid, recipe))
-            >
-                <RecipePicker
-                    rid=rid
-                    selected_recipes={selected_recipes.clone()}
-                    recipe=recipe
-                    items={items.clone()}
-                />
-            </For>
+            <Divider />
+            <Scrollbar>
+                <div class="recipe-list-pickers">
+                    <For
+                        each = move || recipes_to_display.get().clone()
+                        key = |a| a.0
+                        let((rid, recipe))
+                    >
+                        <RecipePicker
+                            rid=rid
+                            selected_recipes={selected_recipes.clone()}
+                            recipe=recipe
+                            items={items.clone()}
+                        />
+                    </For>
+                </div>
+                <BackTop />
+            </Scrollbar>
         </div>
     }
 }

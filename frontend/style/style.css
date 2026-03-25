@@ -115,29 +115,16 @@ body {
     margin-right: 20px;
     margin-left: 20px;
     display: flex;
+    flex-direction: row;
     max-width: 1500px;
     width: 100%;
-}
-
-.recipe-list-header {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
+    max-height: 100%;
 }
 
 .recipe-list-toggles {
     display: flex;
     flex-direction: row;
     justify-content: space-between;
-}
-
-.recipe-list-toggle {
-    margin-left: 5px;
-    margin-right: 5px;
-}
-
-.recipes-divider {
-    /* flex: 1; */
 }
 
 .recipe-picker {
@@ -201,7 +188,8 @@ body {
 .base-recipes,
 .alternate-recipes, 
 .input-ressources-selection,
-.input-custom-selection {
+.input-custom-selection, 
+.item-picking-list {
     flex: 1;
     margin: 10px
 }
@@ -214,15 +202,20 @@ body {
     align-items: center;
 }
 
-.input-ressources-selection-header {
+.input-ressources-selection-header, .recipe-list-header, .item-list-header {
     margin: 10px;
     display: flex;
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
+    height: 40px;
+}
+.item-list-header {
+    justify-content: right;
+    margin-right: 20px;
 }
 
-.items-amount-inputs {
+.items-amount-inputs, .recipe-list-pickers, .item-list-toggles {
     display: flex;
     flex-direction: column;
     margin: 10px;
@@ -252,11 +245,20 @@ body {
     margin-right: 10px;
 }
 
-.input-ressources-selection-toggles {
+.input-ressources-selection-toggles, .recipe-list-toggles {
     display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: center;
     gap: 10px;
     margin-right: 10px;
+}
+
+.recipe-list,
+.base-recipes,
+.alternate-recipes {
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
 }
