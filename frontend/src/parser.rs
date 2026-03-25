@@ -1,3 +1,4 @@
+use core::f64;
 use std::{
     collections::{BTreeMap, BTreeSet},
     rc::Rc,
@@ -15,7 +16,7 @@ use solver::{
 
 use crate::{
     buildings::{Building, Buildings},
-    item::{Item, Items},
+    item::{self, Item, Items},
     recipes::{Recipe, Recipes},
 };
 
@@ -55,6 +56,7 @@ struct MainSeed {
     item_queue: BTreeMap<Rc<str>, ItemId>,
     building_queue: BTreeMap<Rc<str>, BuildingId>,
     buildings: BTreeMap<BuildingId, Arc<Building>>,
+    ressources_queue: BTreeMap<ItemId, Option<f64>>,
     recipe_id: usize,
     item_id: usize,
     building_id: usize,
@@ -95,6 +97,7 @@ impl<'de> Visitor<'de> for &'_ mut MainSeed {
                 MainFields::Items => map.next_value_seed(ItemsSeed { main_seed: self })?,
                 MainFields::Recipes => map.next_value_seed(RecipesSeed { main_seed: self })?,
                 MainFields::Buildings => map.next_value_seed(BuildingsSeed { main_seed: self })?,
+                MainFields::Resources => map.next_value_seed(RessourcesSeed { main_seed: self })?,
                 _ => {
                     // TODO
                     map.next_value::<IgnoredAny>()?;
@@ -143,8 +146,12 @@ impl<'de> Visitor<'de> for ItemsSeed<'_> {
                 }
             };
 
-            let mut item = map.next_value::<Item>()?;
-            item.id = item_id;
+            let seed = ItemSeed {
+                main_seed: self.main_seed,
+                iid: item_id,
+            };
+
+            let item = map.next_value_seed(seed)?;
 
             self.main_seed.items.insert(item_id, Arc::new(item));
         }
@@ -153,15 +160,6 @@ impl<'de> Visitor<'de> for ItemsSeed<'_> {
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(formatter, "a map")
-    }
-}
-
-impl<'de> Deserialize<'de> for Item {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_map(ItemVisitor)
     }
 }
 
@@ -181,7 +179,10 @@ enum ItemField {
     FluidColor,
 }
 
-struct ItemVisitor;
+struct ItemSeed<'a> {
+    iid: ItemId,
+    main_seed: &'a mut MainSeed,
+}
 
 fn deserialize_and_set<'de, T: DeserializeOwned, A: serde::de::MapAccess<'de>>(
     value: &mut Option<T>,
@@ -192,7 +193,18 @@ fn deserialize_and_set<'de, T: DeserializeOwned, A: serde::de::MapAccess<'de>>(
     Ok(())
 }
 
-impl<'de> Visitor<'de> for ItemVisitor {
+impl<'de> DeserializeSeed<'de> for ItemSeed<'_> {
+    type Value = Item;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_map(self)
+    }
+}
+
+impl<'de> Visitor<'de> for ItemSeed<'_> {
     type Value = Item;
 
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
@@ -218,11 +230,19 @@ impl<'de> Visitor<'de> for ItemVisitor {
             }
         }
 
+        let ressource = self
+            .main_seed
+            .ressources_queue
+            .get(&self.iid)
+            .copied()
+            .flatten();
+
         // TODO: don't unwrap here
         Ok(Item {
-            id: ItemId(usize::MAX),
+            id: self.iid,
             icon: icon.unwrap(),
             name: name.unwrap(),
+            ressource,
             description: description.unwrap(),
             sink_points: sink_points.unwrap(),
             liquid: liquid.unwrap(),
@@ -599,5 +619,73 @@ impl<'de> Visitor<'de> for BuildingVisitor {
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(formatter, "a satisfactory item data")
+    }
+}
+
+struct RessourcesSeed<'a> {
+    main_seed: &'a mut MainSeed,
+}
+
+impl<'de> DeserializeSeed<'de> for RessourcesSeed<'_> {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_map(self)
+    }
+}
+
+impl<'de> Visitor<'de> for RessourcesSeed<'_> {
+    type Value = ();
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "a map")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        while let Some(item_class) = map.next_key::<Rc<str>>()? {
+            let item_id = match self.main_seed.item_queue.get(&*item_class) {
+                Some(iid) => *iid,
+                None => {
+                    let iid = ItemId(self.main_seed.item_id);
+                    self.main_seed.item_id += 1;
+                    self.main_seed.item_queue.insert(item_class.clone(), iid);
+                    iid
+                }
+            };
+            let amount = get_ress_amount_for(&item_class);
+            self.main_seed.ressources_queue.insert(item_id, amount);
+            if let Some(item) = self.main_seed.items.get_mut(&item_id) {
+                let item = Arc::get_mut(item).unwrap();
+                item.ressource = amount;
+            }
+            map.next_value::<IgnoredAny>()?;
+        }
+
+        Ok(())
+    }
+}
+
+fn get_ress_amount_for(ress: &str) -> Option<f64> {
+    match ress {
+        "Desc_OreIron_C" => Some(92100.0),
+        "Desc_Coal_C" => Some(42300.0),
+        "Desc_Water_C" => Some(f64::MAX),
+        "Desc_NitrogenGas_C" => Some(12000.0),
+        "Desc_Sulfur_C" => Some(10800.0),
+        "Desc_SAM_C" => Some(10200.0),
+        "Desc_OreBauxite_C" => Some(12300.0),
+        "Desc_OreGold_C" => Some(15000.0),
+        "Desc_OreCopper_C" => Some(36900.0),
+        "Desc_RawQuartz_C" => Some(13500.0),
+        "Desc_Stone_C" => Some(69900.0),
+        "Desc_OreUranium_C" => Some(2100.0),
+        "Desc_LiquidOil_C" => Some(12600.0),
+        _ => None,
     }
 }

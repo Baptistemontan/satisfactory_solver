@@ -17,3 +17,5 @@ serde_json = { workspace = true }
 console_error_panic_hook = { workspace = true }
 thaw = { workspace = true }
 float_eq = { workspace = true }
+yoke = { workspace = true }
+icondata = { workspace = true }

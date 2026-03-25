@@ -13,10 +13,13 @@ use solver::{
 
 use graph::Graph as SolvedGraph;
 
-use crate::{graph_renderer::SerializableGraph, parser, recipes::Recipes};
+use crate::{graph_renderer::SerializableGraph, item::AmountState, parser, recipes::Recipes};
 
 #[component]
-pub fn GraphVisualizer(selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>) -> impl IntoView {
+pub fn GraphVisualizer(
+    selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>,
+    available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>,
+) -> impl IntoView {
     let recipes = expect_context::<Recipes>();
 
     let iron_plate_recipe_id = RecipeId(0);
@@ -25,13 +28,6 @@ pub fn GraphVisualizer(selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>
 
     let iron_ingot_recipe_id = RecipeId(2);
     let iron_ore_item_id = ItemId(137);
-    let crude_oil_id = ItemId(149);
-    let water_id = ItemId(139);
-
-    let availables = BTreeMap::from([
-        (crude_oil_id, Quantity(300.0)),
-        (water_id, Quantity(f64::MAX)),
-    ]);
 
     let target = Target {
         iid: plastic_item_id,
@@ -44,6 +40,12 @@ pub fn GraphVisualizer(selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>
             if selected.get() {
                 let r = recipes.get(*rid).unwrap();
                 solver_recipes.insert(*rid, r.inner.clone());
+            }
+        }
+        let mut availables = BTreeMap::new();
+        for (iid, qty) in &*available_items {
+            if let AmountState::Some(qty) = qty.get() {
+                availables.insert(*iid, Quantity(qty));
             }
         }
 

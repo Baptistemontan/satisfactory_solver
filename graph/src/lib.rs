@@ -119,7 +119,7 @@ fn build_graph<S: LPSolver>(
     let mut nodes = Vec::new();
     for target in targets.iter() {
         let Some(target_out_qty) = outputs.get(target) else {
-            todo!("target {:#?} not found", target);
+            continue;
         };
         item_queue.push_back((*target, nodes.len(), *target_out_qty));
         nodes.push(Node::Output {

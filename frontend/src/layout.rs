@@ -1,7 +1,8 @@
+use core::f64;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::item::{ItemSelector, Items};
+use crate::item::{AmountState, InputTab, Items};
 use crate::recipes::RecipeTab;
 use crate::{graph_renderer::component::GraphVisualizer, recipes::Recipes};
 use leptos::either::EitherOf3;
@@ -63,14 +64,32 @@ pub fn Header(selected_tab: RwSignal<String>, theme: RwSignal<Theme>) -> impl In
 
 #[component]
 pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
-    let recipes = expect_context::<Recipes>();
     let items = expect_context::<Items>();
-    let selected_items = items
+    let recipes = expect_context::<Recipes>();
+    let available_items = items
         .items
         .keys()
-        .map(|iid| (*iid, RwSignal::new(false)))
+        .filter_map(|iid| {
+            let item = items.items.get(iid)?;
+            let amount_state = match item.ressource {
+                Some(qty) => AmountState::Some(qty),
+                None => AmountState::None,
+            };
+            Some((*iid, RwSignal::new(amount_state)))
+        })
         .collect::<BTreeMap<_, _>>();
-    let selected_items = Arc::new(selected_items);
+
+    /* setup */
+
+    // let crude_oil_id = ItemId(149);
+    // let water_id = ItemId(139);
+
+    // available_items.insert(crude_oil_id, RwSignal::new(AmountState::Some(300.0)));
+    // available_items.insert(water_id, RwSignal::new(AmountState::Some(f64::MAX)));
+
+    /* end setup */
+
+    let available_items = Arc::new(available_items);
     let selected_recipes = recipes
         .recipes
         .keys()
@@ -80,10 +99,11 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
     move || {
         let tab = selected_tab.get();
         let selected_recipes = selected_recipes.clone();
+        let available_items = available_items.clone();
         match tab.as_str() {
             PRODUCTION => EitherOf3::A(view! {
                 <ContentInner>
-                    <GraphVisualizer selected_recipes=selected_recipes />
+                    <GraphVisualizer selected_recipes=selected_recipes available_items=available_items />
                 </ContentInner>
             }),
             RECIPES => EitherOf3::B(view! {
@@ -92,7 +112,7 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
                 </ContentInner>
             }),
             INPUTS => EitherOf3::C(view! {
-                <ItemSelector items={items.clone()} selected_items={selected_items.clone()} />
+                <InputTab available_items=available_items />
             }),
             _ => unreachable!(),
         }

@@ -3,13 +3,13 @@ use std::{
     sync::Arc,
 };
 
-use solver::recipe::ItemId;
+use solver::{quantity::Quantity, recipe::ItemId};
 
 use crate::{BASE_URL, utils::ArcIter};
-use leptos::prelude::*;
+use leptos::{either::Either, prelude::*};
 use thaw::{
-    Button, ButtonAppearance, Checkbox, DrawerBody, DrawerHeader, DrawerHeaderTitle,
-    DrawerHeaderTitleAction, Input, OverlayDrawer,
+    Button, ButtonAppearance, Checkbox, Divider, DrawerBody, DrawerHeader, DrawerHeaderTitle,
+    DrawerHeaderTitleAction, Input, OverlayDrawer, SpinButton, Tooltip,
 };
 
 #[derive(Debug)]
@@ -17,9 +17,21 @@ pub struct Item {
     pub id: ItemId,
     pub icon: Arc<str>,
     pub name: Arc<str>,
+    pub ressource: Option<f64>,
     pub description: Arc<str>,
     pub sink_points: f64,
     pub liquid: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum AmountState {
+    None,
+    Some(f64),
+    Disabled(f64),
+    EnabledZero,
+    DisabledZero,
+    Maximize(f64),
+    MaximizeDisabled(f64),
 }
 
 #[derive(Debug, Clone)]
@@ -28,15 +40,130 @@ pub struct Items {
 }
 
 #[component]
-pub fn ItemSelector(
-    items: Items,
-    selected_items: Arc<BTreeMap<ItemId, RwSignal<bool>>>,
-) -> impl IntoView {
+pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -> impl IntoView {
+    let items = expect_context::<Items>();
+    let mut selected_items = BTreeMap::new();
+    {
+        for (iid, item) in items.items.iter() {
+            if item.ressource.is_some() {
+                continue;
+            }
+            let is_selected = available_items
+                .get(iid)
+                .is_some_and(|v| !matches!(v.get_untracked(), AmountState::None));
+            selected_items.insert(*iid, RwSignal::new(is_selected));
+        }
+    }
+    let selected_items = Arc::new(selected_items);
+
+    let ressources = Memo::new({
+        let available_items = available_items.clone();
+        let items = items.clone();
+        move |_| {
+            let mut ressources = Vec::new();
+            for (iid, item) in items.items.iter() {
+                if item.ressource.is_some() {
+                    let amount = available_items.get(iid).unwrap();
+                    ressources.push((*iid, *amount));
+                }
+            }
+            ressources
+        }
+    });
+
+    let item_selection = Memo::new({
+        let selected_items = selected_items.clone();
+        move |_| {
+            let mut items = Vec::new();
+            for (iid, selected) in &*selected_items {
+                let amount = available_items.get(iid).unwrap();
+                if selected.get() {
+                    items.push((*iid, *amount));
+                } else {
+                    amount.set(AmountState::None);
+                }
+            }
+            items
+        }
+    });
+
+    let set_ressources_to_zero = move |_| {
+        let rs = ressources.read();
+        for (_, amount) in &*rs {
+            amount.update(|current| match current {
+                AmountState::None
+                | AmountState::Some(_)
+                | AmountState::EnabledZero
+                | AmountState::Maximize(_) => {
+                    *current = AmountState::EnabledZero;
+                }
+                AmountState::Disabled(_)
+                | AmountState::DisabledZero
+                | AmountState::MaximizeDisabled(_) => {
+                    *current = AmountState::DisabledZero;
+                }
+            });
+        }
+    };
+
+    let set_ressources_to_max = move |_| {
+        let rs = ressources.read();
+        for (iid, amount) in &*rs {
+            let item = items.items.get(iid).unwrap();
+            let qty = item.ressource.unwrap();
+            amount.update(|current| match current {
+                AmountState::None
+                | AmountState::Some(_)
+                | AmountState::EnabledZero
+                | AmountState::Maximize(_) => {
+                    *current = AmountState::Some(qty);
+                }
+                AmountState::Disabled(_)
+                | AmountState::DisabledZero
+                | AmountState::MaximizeDisabled(_) => {
+                    *current = AmountState::Disabled(qty);
+                }
+            });
+        }
+    };
+
+    view! {
+        <div class="input-items-selection">
+            <div class="input-ressources-selection">
+                <div class="input-ressources-selection-header">
+                    <span>"Ressources"</span>
+                    <div class="input-ressources-selection-toggles">
+                        <Button on_click=set_ressources_to_zero>"Set to 0"</Button>
+                        <Button on_click=set_ressources_to_max>"Set to max"</Button>
+                    </div>
+                </div>
+                <Divider />
+                <ItemsAmountInput item_selection=ressources />
+            </div>
+            <div class="input-selection-divider">
+                <Divider vertical=true />
+            </div>
+            <div class="input-custom-selection">
+                <div class="input-ressources-selection-header">
+                    <span>"Inputs"</span>
+                    <div class="input-ressources-selection-toggles">
+                        <ItemSelector selected_items={selected_items.clone()} />
+                    </div>
+                </div>
+                <Divider />
+                <ItemsAmountInput item_selection=item_selection selected=selected_items />
+            </div>
+        </div>
+    }
+}
+
+#[component]
+pub fn ItemSelector(selected_items: Arc<BTreeMap<ItemId, RwSignal<bool>>>) -> impl IntoView {
     let drawer_open = RwSignal::new(false);
     let on_open = move |_| drawer_open.set(true);
     let on_close = move |_| drawer_open.set(false);
     view! {
-        <Button on_click=on_open>"Add Item"</Button>
+        <Button on_click=on_open>"Edit Inputs"</Button>
         <OverlayDrawer open=drawer_open>
             <DrawerHeader>
             <DrawerHeaderTitle>
@@ -48,18 +175,19 @@ pub fn ItemSelector(
                         "x"
                     </Button>
                 </DrawerHeaderTitleAction>
-                "Select Item"
+                "Toggle Item"
             </DrawerHeaderTitle>
             </DrawerHeader>
             <DrawerBody>
-                <ItemList items=items selected_items=selected_items/>
+                <ItemList selected_items=selected_items/>
             </DrawerBody>
         </OverlayDrawer>
     }
 }
 
 #[component]
-fn ItemList(items: Items, selected_items: Arc<BTreeMap<ItemId, RwSignal<bool>>>) -> impl IntoView {
+fn ItemList(selected_items: Arc<BTreeMap<ItemId, RwSignal<bool>>>) -> impl IntoView {
+    let items = expect_context::<Items>();
     let search_value = RwSignal::new(String::new());
 
     let search_helper = selected_items
@@ -101,7 +229,6 @@ fn ItemList(items: Items, selected_items: Arc<BTreeMap<ItemId, RwSignal<bool>>>)
             >
                 <DisplayItem
                     item_id = iid
-                    items = {items.clone()}
                     selected = toggle
                 />
             </For>
@@ -114,15 +241,132 @@ fn format_icon_href(icon: &str) -> String {
 }
 
 #[component]
-fn DisplayItem(item_id: ItemId, items: Items, selected: RwSignal<bool>) -> impl IntoView {
+fn DisplayItem(item_id: ItemId, selected: RwSignal<bool>) -> impl IntoView {
+    let items = expect_context::<Items>();
     let item = items.items.get(&item_id).unwrap();
     let item_name = item.name.clone();
     let icon_href = format_icon_href(&item.icon);
     view! {
-        <div class="item-selection">
+        <div class="item-list-toggle">
             <span>{item_name}</span>
-            <img src=icon_href class="item-selection-icon" />
+            <img src=icon_href class="item-list-toggle-icon" />
             <Checkbox checked=selected />
+        </div>
+    }
+}
+
+#[component]
+pub fn ItemsAmountInput(
+    item_selection: Memo<Vec<(ItemId, RwSignal<AmountState>)>>,
+    #[prop(optional)] selected: Option<Arc<BTreeMap<ItemId, RwSignal<bool>>>>,
+    #[prop(default = false)] maximize: bool,
+) -> impl IntoView {
+    view! {
+        <div class="items-amount-inputs">
+            <For
+                each = move || item_selection.get()
+                key = |a| a.0
+                let((iid, amount))
+            >
+                <ItemAmountInput
+                    item_id = iid
+                    amount = amount
+                    selected={selected.clone()}
+                    maximize=maximize
+                />
+            </For>
+        </div>
+    }
+}
+
+#[component]
+fn ItemAmountInput(
+    item_id: ItemId,
+    amount: RwSignal<AmountState>,
+    selected: Option<Arc<BTreeMap<ItemId, RwSignal<bool>>>>,
+    maximize: bool,
+) -> impl IntoView {
+    let items = expect_context::<Items>();
+    let item = items.items.get(&item_id).unwrap();
+    let name = item.name.clone();
+    let icon_href = format_icon_href(&item.icon);
+    let (current_value, activated) = match amount.get_untracked() {
+        AmountState::None | AmountState::EnabledZero => (0.0, true),
+        AmountState::Some(qty) => (qty, true),
+        AmountState::Disabled(qty) => (qty, false),
+        AmountState::DisabledZero => (0.0, false),
+        AmountState::Maximize(qty) => (qty, true),
+        AmountState::MaximizeDisabled(qty) => (qty, false),
+    };
+    let current_value = RwSignal::new(current_value);
+    let activated = RwSignal::new(activated);
+
+    let delete_button = selected
+        .as_ref()
+        .and_then(|s| s.get(&item_id))
+        .copied()
+        .map(|delete| {
+            let on_delete = move |_| {
+                delete.set(false);
+            };
+            view! {
+                <Button icon=icondata::AiCloseOutlined on_click=on_delete />
+            }
+        });
+
+    let maximize_status = RwSignal::new(false);
+
+    let maximize_button = bool::then(maximize, move || {
+        view! {
+            <Tooltip content="Maximize" >
+                <Checkbox checked=maximize_status/>
+            </Tooltip>
+        }
+    });
+
+    Effect::new(move || {
+        let qty = current_value.get();
+        let active = activated.get();
+        let maximize = maximize_status.get();
+        let non_zero = qty >= 1e-5;
+        match (active, non_zero, maximize) {
+            (true, true, false) => {
+                amount.set(AmountState::Some(qty));
+            }
+            (false, true, false) => {
+                amount.set(AmountState::Disabled(qty));
+            }
+            (true, false, false) => {
+                amount.set(AmountState::EnabledZero);
+            }
+            (false, false, false) => {
+                amount.set(AmountState::DisabledZero);
+            }
+            (true, _, true) => {
+                amount.set(AmountState::Maximize(qty));
+            }
+            (false, _, true) => {
+                amount.set(AmountState::MaximizeDisabled(qty));
+            }
+        }
+    });
+
+    let amount_input_disabled = move || !activated.get() || maximize_status.get();
+
+    view! {
+        <div class="item-amount-input">
+            <div class="item-amount-input-item">
+                <Checkbox checked=activated/>
+                <div>
+                    <img src=icon_href class="item-amount-input-icon" />
+                </div>
+                <span>{name}</span>
+            </div>
+            <div class="item-amount-input-amount">
+                {delete_button}
+                <SpinButton<f64> value=current_value step_page=1.0 disabled=amount_input_disabled min=0.0 />
+                {maximize_button}
+            </div>
         </div>
     }
 }

@@ -153,7 +153,9 @@ pub fn sort_nodes(graph: &Graph) -> (BTreeMap<usize, usize>, usize) {
             *level -= diff;
         }
     }
-    maximum_level -= empty_levels.len();
+    if maximum_level >= empty_levels.len() {
+        maximum_level -= empty_levels.len();
+    }
 
     (levels, maximum_level)
 }
