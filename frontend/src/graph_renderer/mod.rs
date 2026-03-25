@@ -101,10 +101,7 @@ impl NodeData {
 
     pub fn amount(self) -> f64 {
         match self.0 {
-            graph::Node::Recipe { rid, amount } => {
-                let recipe = get_recipe(rid);
-                (60.0 / recipe.time()) * amount
-            }
+            graph::Node::Recipe { amount, .. } => amount,
             graph::Node::Input { amount, .. } => amount,
             graph::Node::Output { amount, .. } => amount,
             graph::Node::Excess { amount, .. } => amount,
@@ -201,11 +198,24 @@ fn snap_to_increment(x: f64) -> f64 {
     (x / POSITION_INCREMENT).round() * POSITION_INCREMENT
 }
 
+pub struct VisualGraph {
+    pub nodes: Arc<[Node]>,
+    pub edges: Arc<[Edge]>,
+}
+
+impl VisualGraph {
+    pub fn from_solved_graph(graph: &SolvedGraph) -> Self {
+        let nodes = sort_nodes(graph);
+        let edges = Arc::from(graph.edges());
+        Self { nodes, edges }
+    }
+}
+
 #[component]
-pub fn Graph(graph: SolvedGraph) -> impl IntoView {
-    let nodes = sort_nodes(&graph);
+pub fn Graph(graph: VisualGraph) -> impl IntoView {
+    let nodes = graph.nodes.clone();
     let edges = graph
-        .edges()
+        .edges
         .iter()
         .map(|edge| render_edge(*edge, nodes.clone()))
         .collect::<Vec<_>>();
@@ -295,9 +305,7 @@ pub fn Graph(graph: SolvedGraph) -> impl IntoView {
 
     view! {
         <svg
-            width="1200"
-            height="800"
-            style="background: #0f1117;"
+            class="graph-root"
             on:wheel=on_wheel
             on:mousedown=on_mousedown
             on:mousemove=on_mousemove

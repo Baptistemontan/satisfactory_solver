@@ -18,6 +18,8 @@ use solver::{
     solver::{Solver, Target},
 };
 
+use crate::graph_renderer::VisualGraph;
+
 const DATA: &str = include_str!("../../data/data.json");
 const DEFAULT_BASE_URL: &str = "/";
 pub const BASE_URL: &str = const {
@@ -65,7 +67,9 @@ pub fn App() -> impl IntoView {
     provide_context(items);
     provide_context(buildings);
 
+    let visual_graph = VisualGraph::from_solved_graph(&graph);
+
     view! {
-        <Graph graph/>
+        <Graph graph=visual_graph/>
     }
 }
