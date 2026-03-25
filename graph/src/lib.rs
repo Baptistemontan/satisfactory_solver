@@ -9,7 +9,7 @@ use good_lp::Solver as LPSolver;
 use solver::{
     quantity::Quantity,
     recipe::{ItemId, Recipe, RecipeId},
-    solver::Solution,
+    solver::{Solution, Target},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -97,7 +97,7 @@ pub struct Graph {
 
 fn build_graph<S: LPSolver>(
     recipes: &BTreeMap<RecipeId, Arc<Recipe>>,
-    targets: &[ItemId],
+    targets: &[Target],
     solution: &Solution<S>,
 ) -> Graph {
     let used_recipes = solution.get_recipes();
@@ -118,12 +118,12 @@ fn build_graph<S: LPSolver>(
 
     let mut nodes = Vec::new();
     for target in targets.iter() {
-        let Some(target_out_qty) = outputs.get(target) else {
+        let Some(target_out_qty) = outputs.get(&target.iid) else {
             continue;
         };
-        item_queue.push_back((*target, nodes.len(), *target_out_qty));
+        item_queue.push_back((target.iid, nodes.len(), *target_out_qty));
         nodes.push(Node::Output {
-            iid: *target,
+            iid: target.iid,
             amount: *target_out_qty,
         });
     }
@@ -338,7 +338,7 @@ pub struct GraphToDot<'a>(&'a Graph);
 impl Graph {
     pub fn build_from_solution<S: LPSolver>(
         solution: &Solution<S>,
-        targets: &[ItemId],
+        targets: &[Target],
         recipes: &BTreeMap<RecipeId, Arc<Recipe>>,
     ) -> Self {
         build_graph(recipes, targets, solution)
@@ -415,7 +415,7 @@ mod tests {
             .optimize(SOLVER, &[target], &availables)
             .unwrap();
 
-        let graph = build_graph(&recipes, &[target.iid], &solution);
+        let graph = build_graph(&recipes, &[target], &solution);
 
         // println!("\n\n\n---Results---");
         // println!("{:#?}", graph.0);

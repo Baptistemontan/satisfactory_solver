@@ -175,6 +175,61 @@ pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -
     }
 }
 
+#[component]
+pub fn OutputsTab(targets: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -> impl IntoView {
+    let items = expect_context::<Items>();
+    let mut selected_items = BTreeMap::new();
+    {
+        for (iid, item) in items.items.iter() {
+            if item.ressource.is_some() {
+                continue;
+            }
+            let is_selected = targets
+                .get(iid)
+                .is_some_and(|v| !matches!(v.get_untracked(), AmountState::None));
+            // selected_items.insert(*iid, RwSignal::new(is_selected));
+            selected_items.insert(*iid, RwSignal::new(is_selected));
+        }
+    }
+    let selected_items = Arc::new(selected_items);
+
+    let item_selection = Memo::new({
+        let selected_items = selected_items.clone();
+        move |_| {
+            let mut items = Vec::new();
+            for (iid, selected) in &*selected_items {
+                let amount = targets.get(iid).unwrap();
+                if selected.get() {
+                    items.push((*iid, *amount));
+                } else {
+                    amount.set(AmountState::None);
+                }
+            }
+            items
+        }
+    });
+
+    view! {
+        <div class="input-items-selection">
+            <ItemList selected_items={selected_items.clone()}/>
+            <div class="input-selection-divider">
+                <Divider vertical=true />
+            </div>
+            <div class="input-custom-selection">
+                <div class="input-ressources-selection-header">
+                    <span>"Outputs"</span>
+                    <div class="input-ressources-selection-toggles">
+                        // <ItemSelector selected_items={selected_items.clone()} />
+                        // <Switch checked=input_selection label="Edit Inputs"  />
+                    </div>
+                </div>
+                <Divider />
+                <ItemsAmountInput item_selection=item_selection selected=selected_items maximize=true />
+            </div>
+        </div>
+    }
+}
+
 // #[component]
 // pub fn ItemSelector(selected_items: Arc<BTreeMap<ItemId, RwSignal<bool>>>) -> impl IntoView {
 //     let drawer_open = RwSignal::new(false);
@@ -319,13 +374,13 @@ fn ItemAmountInput(
     let item = items.items.get(&item_id).unwrap();
     let name = item.name.clone();
     let icon_href = format_icon_href(&item.icon);
-    let (current_value, activated) = match amount.get_untracked() {
-        AmountState::None | AmountState::EnabledZero => (0.0, true),
-        AmountState::Some(qty) => (qty, true),
-        AmountState::Disabled(qty) => (qty, false),
-        AmountState::DisabledZero => (0.0, false),
-        AmountState::Maximize(qty) => (qty, true),
-        AmountState::MaximizeDisabled(qty) => (qty, false),
+    let (current_value, activated, currently_maximized) = match amount.get_untracked() {
+        AmountState::None | AmountState::EnabledZero => (0.0, true, false),
+        AmountState::Some(qty) => (qty, true, false),
+        AmountState::Disabled(qty) => (qty, false, false),
+        AmountState::DisabledZero => (0.0, false, false),
+        AmountState::Maximize(qty) => (qty, true, true),
+        AmountState::MaximizeDisabled(qty) => (qty, false, true),
     };
     let current_value = RwSignal::new(current_value);
     let activated = RwSignal::new(activated);
@@ -343,7 +398,7 @@ fn ItemAmountInput(
             }
         });
 
-    let maximize_status = RwSignal::new(false);
+    let maximize_status = RwSignal::new(currently_maximized && maximize);
 
     let maximize_button = bool::then(maximize, move || {
         view! {

@@ -145,13 +145,13 @@ impl PartialEq for Position {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Node {
+pub struct Node {
     data: NodeData,
     pos: RwSignal<Position>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct SNode {
+pub struct SNode {
     data: NodeData,
     pos: Position,
 }

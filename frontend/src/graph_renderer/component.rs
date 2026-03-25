@@ -19,6 +19,7 @@ use crate::{graph_renderer::SerializableGraph, item::AmountState, parser, recipe
 pub fn GraphVisualizer(
     selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>,
     available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>,
+    targets: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>,
 ) -> impl IntoView {
     let recipes = expect_context::<Recipes>();
 
@@ -48,12 +49,24 @@ pub fn GraphVisualizer(
                 availables.insert(*iid, Quantity(qty));
             }
         }
+        let mut solve_for = Vec::new();
+        for (iid, qty) in &*targets {
+            let target_qty = match qty.get() {
+                AmountState::Maximize(_) => None,
+                AmountState::Some(qty) => Some(Quantity(qty)),
+                _ => continue,
+            };
+            solve_for.push(Target {
+                iid: *iid,
+                qty: target_qty,
+            });
+        }
 
         let solution = Solver::new(&solver_recipes)
-            .optimize(SOLVER, &[target], &availables)
+            .optimize(SOLVER, &solve_for, &availables)
             .ok()?;
 
-        let graph = SolvedGraph::build_from_solution(&solution, &[target.iid], &solver_recipes);
+        let graph = SolvedGraph::build_from_solution(&solution, &solve_for, &solver_recipes);
 
         Some(SerializableGraph::from_solved_graph(&graph))
     });
