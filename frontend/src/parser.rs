@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, rc::Rc, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    rc::Rc,
+    sync::Arc,
+};
 
 use serde::{
     Deserialize,
@@ -22,15 +26,25 @@ where
     let mut de = serde_json::Deserializer::from_reader(reader);
     let mut main_seed = MainSeed::default();
     DeserializeSeed::deserialize(&mut main_seed, &mut de)?;
+    let mut building_recipes: BTreeMap<BuildingId, Arc<BTreeSet<RecipeId>>> = BTreeMap::new();
+    for recipe in main_seed.recipes.values() {
+        let recipes = building_recipes.entry(recipe.inner.building).or_default();
+        let recipes = Arc::get_mut(recipes).unwrap();
+        recipes.insert(recipe.id);
+    }
 
     let recipes = Arc::new(main_seed.recipes);
     let items = Arc::new(main_seed.items);
     let buildings = Arc::new(main_seed.buildings);
+    let building_recipes = Arc::new(building_recipes);
 
     Ok((
         Recipes { recipes },
         Items { items },
-        Buildings { buildings },
+        Buildings {
+            buildings,
+            recipes: building_recipes,
+        },
     ))
 }
 
@@ -62,11 +76,11 @@ impl<'de> DeserializeSeed<'de> for &'_ mut MainSeed {
 enum MainFields {
     Items,
     Recipes,
+    Buildings,
     Schematics,
     Generators,
     Resources,
     Miners,
-    Buildings,
 }
 
 impl<'de> Visitor<'de> for &'_ mut MainSeed {

@@ -5,7 +5,9 @@ use crate::{
     buildings::{Building, Buildings},
     item::{Item, Items},
     recipes::{Recipe, Recipes},
+    utils::ArcIter,
 };
+use float_eq::float_eq;
 use graph::{Edge, Graph as SolvedGraph};
 use leptos::{
     ev::{MouseEvent, WheelEvent},
@@ -14,6 +16,7 @@ use leptos::{
 use solver::recipe::{BuildingId, ItemId, RecipeId};
 use web_sys::wasm_bindgen::JsCast;
 
+pub mod component;
 mod sort_nodes;
 
 const NODE_WIDTH: i32 = 100;
@@ -48,7 +51,7 @@ fn get_building(bid: BuildingId) -> Arc<Building> {
     building.clone()
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct NodeData(graph::Node);
 
 fn format_icon_href(icon: &str) -> String {
@@ -127,40 +130,33 @@ impl NodeData {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Debug)]
 struct Position {
     x: f64,
     y: f64,
+}
+
+impl Eq for Position {}
+
+impl PartialEq for Position {
+    fn eq(&self, other: &Self) -> bool {
+        float_eq!(self.x, other.x, abs <= 1e-5) && float_eq!(self.y, other.y, abs <= 1e-5)
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
 struct Node {
     data: NodeData,
     pos: RwSignal<Position>,
-    size: i32,
 }
 
-struct NodeIter {
-    current: usize,
-    nodes: Arc<[Node]>,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SNode {
+    data: NodeData,
+    pos: Position,
 }
 
-impl Iterator for NodeIter {
-    type Item = Node;
-    fn next(&mut self) -> Option<Self::Item> {
-        let next = self.nodes.get(self.current)?;
-        self.current += 1;
-        Some(*next)
-    }
-}
-
-impl NodeIter {
-    pub fn new(nodes: Arc<[Node]>) -> Self {
-        Self { current: 0, nodes }
-    }
-}
-
-fn sort_nodes(graph: &SolvedGraph) -> Arc<[Node]> {
+fn sort_nodes(graph: &SolvedGraph) -> Arc<[SNode]> {
     let (levels, max_level) = sort_nodes::sort_nodes(graph);
 
     let mut level_y = vec![100.0; max_level + 1];
@@ -181,13 +177,12 @@ fn sort_nodes(graph: &SolvedGraph) -> Arc<[Node]> {
         };
         let height = compute_node_height(size) as f64;
         *y += height + 50.0;
-        nodes.push(Node {
+        nodes.push(SNode {
             data: NodeData(*node),
-            pos: RwSignal::new(Position {
+            pos: Position {
                 x: node_x,
                 y: node_y,
-            }),
-            size,
+            },
         });
     }
 
@@ -198,12 +193,13 @@ fn snap_to_increment(x: f64) -> f64 {
     (x / POSITION_INCREMENT).round() * POSITION_INCREMENT
 }
 
-pub struct VisualGraph {
-    pub nodes: Arc<[Node]>,
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct SerializableGraph {
+    pub nodes: Arc<[SNode]>,
     pub edges: Arc<[Edge]>,
 }
 
-impl VisualGraph {
+impl SerializableGraph {
     pub fn from_solved_graph(graph: &SolvedGraph) -> Self {
         let nodes = sort_nodes(graph);
         let edges = Arc::from(graph.edges());
@@ -211,8 +207,31 @@ impl VisualGraph {
     }
 }
 
+pub struct VisualGraph {
+    pub nodes: Arc<[Node]>,
+    pub edges: Arc<[Edge]>,
+}
+
+impl VisualGraph {
+    pub fn from_serializable_graph(graph: &SerializableGraph) -> Self {
+        let nodes = graph
+            .nodes
+            .iter()
+            .map(|n| Node {
+                pos: RwSignal::new(n.pos),
+                data: n.data,
+            })
+            .collect();
+        VisualGraph {
+            nodes,
+            edges: graph.edges.clone(),
+        }
+    }
+}
+
 #[component]
-pub fn Graph(graph: VisualGraph) -> impl IntoView {
+pub fn Graph(graph: SerializableGraph) -> impl IntoView {
+    let graph = VisualGraph::from_serializable_graph(&graph);
     let nodes = graph.nodes.clone();
     let edges = graph
         .edges
@@ -333,7 +352,7 @@ pub fn Graph(graph: VisualGraph) -> impl IntoView {
             </defs>
             <g transform=transform>
                 <For
-                    each = move || NodeIter::new(nodes.clone())
+                    each = move || ArcIter::new(nodes.clone())
                     key = |node| node.data.to_key()
                     children = move |node| render_node(node, node_drag, svg_space_offset)
                 />
@@ -354,10 +373,7 @@ fn render_node<F>(node: Node, node_drag: NodeDrag, svg_space_offset: F) -> impl 
 where
     F: Fn(MouseEvent) -> (f64, f64) + 'static,
 {
-    let Node { data, pos, size } = node;
-    // let dragging = RwSignal::new(false);
-    // let drag_start_x = RwSignal::new(0.0f64);
-    // let drag_start_y = RwSignal::new(0.0f64);
+    let Node { data, pos } = node;
 
     let on_mousedown = move |e: MouseEvent| {
         if e.button() != 0 {
@@ -380,7 +396,7 @@ where
     };
     let transform = move || pos_to_transform(pos.get());
 
-    let inner = render_node_inner(data, size);
+    let inner = render_node_inner(data);
 
     view! {
         <g
@@ -401,9 +417,10 @@ fn compute_node_height(size: i32) -> i32 {
     ((MIN_NODE_HEIGHT / 2) * (size + 1)).max(MIN_NODE_HEIGHT)
 }
 
-fn render_node_inner(data: NodeData, size: i32) -> impl IntoView {
+fn render_node_inner(data: NodeData) -> impl IntoView {
     let inputs = data.inputs();
     let outputs = data.outputs();
+    let size = inputs.len().max(outputs.len()) as i32;
     let input_count = inputs.len();
     let output_count = outputs.len();
     let height = compute_node_height(size);
@@ -507,13 +524,14 @@ fn edge_path(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
 fn compute_offset(node: Node, iid: ItemId, input: bool) -> (i32, i32) {
     let inputs = node.data.inputs();
     let outputs = node.data.outputs();
+    let size = inputs.len().max(outputs.len()) as i32;
 
     let io = if input { &outputs } else { &inputs };
 
     let Some(pos) = io.iter().position(|(a, _)| *a == iid) else {
         todo!("item {:?} not found in node {:?} outputs", iid, node);
     };
-    let y = compute_io_y_offset(pos, io.len(), node.size);
+    let y = compute_io_y_offset(pos, io.len(), size);
     let x = if input {
         NODE_WIDTH + IO_CIRCLE_RADIUS
     } else {

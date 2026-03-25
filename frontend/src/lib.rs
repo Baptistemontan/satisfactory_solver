@@ -1,22 +1,22 @@
-use core::f64;
-use std::{collections::BTreeMap, rc::Rc, sync::Arc};
-
-use graph::Graph as SolvedGraph;
 use leptos::prelude::*;
 
 mod buildings;
 mod graph_renderer;
 mod item;
+mod layout;
 mod parser;
 mod recipes;
+mod utils;
 
 use graph_renderer::Graph;
+use layout::Layout;
 use solver::{
     SOLVER,
     quantity::Quantity,
     recipe::{ItemId, RecipeId},
     solver::{Solver, Target},
 };
+use thaw::{ConfigProvider, Theme};
 
 use crate::graph_renderer::VisualGraph;
 
@@ -32,44 +32,56 @@ pub const BASE_URL: &str = const {
 #[component]
 pub fn App() -> impl IntoView {
     let (recipes, items, buildings) = parser::parse(std::io::Cursor::new(DATA)).unwrap();
-    let iron_plate_recipe_id = RecipeId(0);
-    let iron_plate_item_id = ItemId(4);
-    let plastic_item_id = ItemId(59);
-
-    let iron_ingot_recipe_id = RecipeId(2);
-    let iron_ore_item_id = ItemId(137);
-    let crude_oil_id = ItemId(149);
-    let water_id = ItemId(139);
-
-    let solver_recipes = recipes
-        .recipes
-        .iter()
-        .map(|(rid, recipe)| (*rid, recipe.inner.clone()))
-        .collect();
-
-    let availables = BTreeMap::from([
-        (crude_oil_id, Quantity(300.0)),
-        (water_id, Quantity(f64::MAX)),
-    ]);
-
-    let target = Target {
-        iid: plastic_item_id,
-        qty: None,
-    };
-
-    let solution = Solver::new(&solver_recipes)
-        .optimize(SOLVER, &[target], &availables)
-        .unwrap();
-
-    let graph = SolvedGraph::build_from_solution(&solution, &[target.iid], &solver_recipes);
-
     provide_context(recipes);
     provide_context(items);
     provide_context(buildings);
+    // let (recipes, items, buildings) = parser::parse(std::io::Cursor::new(DATA)).unwrap();
+    // let iron_plate_recipe_id = RecipeId(0);
+    // let iron_plate_item_id = ItemId(4);
+    // let plastic_item_id = ItemId(59);
 
-    let visual_graph = VisualGraph::from_solved_graph(&graph);
+    // let iron_ingot_recipe_id = RecipeId(2);
+    // let iron_ore_item_id = ItemId(137);
+    // let crude_oil_id = ItemId(149);
+    // let water_id = ItemId(139);
+
+    // let solver_recipes = recipes
+    //     .recipes
+    //     .iter()
+    //     .map(|(rid, recipe)| (*rid, recipe.inner.clone()))
+    //     .collect();
+
+    // let availables = BTreeMap::from([
+    //     (crude_oil_id, Quantity(300.0)),
+    //     (water_id, Quantity(f64::MAX)),
+    // ]);
+
+    // let target = Target {
+    //     iid: plastic_item_id,
+    //     qty: None,
+    // };
+
+    // let solution = Solver::new(&solver_recipes)
+    //     .optimize(SOLVER, &[target], &availables)
+    //     .unwrap();
+
+    // let graph = SolvedGraph::build_from_solution(&solution, &[target.iid], &solver_recipes);
+
+    // provide_context(recipes);
+    // provide_context(items);
+    // provide_context(buildings);
+
+    // let visual_graph = VisualGraph::from_solved_graph(&graph);
+
+    // view! {
+    //     <Graph graph=visual_graph/>
+    // }
+
+    let theme = RwSignal::new(Theme::dark());
 
     view! {
-        <Graph graph=visual_graph/>
+        <ConfigProvider theme=theme class="thaw-provider">
+            <Layout theme=theme />
+        </ConfigProvider>
     }
 }

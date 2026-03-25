@@ -1,5 +1,5 @@
 use crate::{
-    error::{Result, try_solver_err},
+    error::{Error, Result, try_solver_err},
     quantity::Quantity,
     recipe::{ItemId, Recipe, RecipeId},
 };
@@ -88,7 +88,7 @@ impl Solver {
 
         let mut problem = if let Some(target_id) = maximize_target {
             let Some(target_sink) = sinks.get(&target_id) else {
-                todo!("no recipe for item {:?}", target_id);
+                return Err(Error::NoRecipe(target_id));
             };
             vars.maximise(target_sink).using(solver)
         } else {
@@ -101,7 +101,7 @@ impl Solver {
 
         for (iid, qty) in constraints {
             let Some(sink) = sinks.get(iid) else {
-                todo!("no recipe for item {:?}", iid);
+                return Err(Error::NoRecipe(*iid));
             };
             let constraint = constraint!(*sink == *qty);
             problem = problem.with(constraint)

@@ -55,6 +55,135 @@ foreignObject {
 
 .graph-root {
     width: 100%;
-    height: 800px;
+    height: 100%;
+    flex: 1;
+    display: block;
     background: #0f1117;
+}
+
+html, body {
+    margin: 0;
+    height: 100vh;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+.layout {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.footer {
+    margin-top: auto;
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+}
+
+.thaw-provider {
+    min-height: 100vh;
+}
+
+.header {
+    margin-left: 20px;
+    margin-right: 20px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.selectors {
+    display: flex;
+    flex-direction: right;
+}
+
+.selector {
+    margin-left: 3px;
+    margin-right: 3px;
+}
+
+.recipes {
+    margin-right: 20px;
+    margin-left: 20px;
+    display: flex;
+    float: left;
+    max-width: 1500px;
+    width: 100%;
+}
+
+.recipes-divider {
+    /* flex: 1; */
+}
+
+.recipe-picker {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.recipe-checkbox {
+    display: flex;
+    flex-direction: left;
+    justify-content: left;
+    align-items: center;
+}
+
+.recipe-outputs {
+    width: 120px;
+    margin-left: 5px;
+    display: flex;
+    flex-direction: left;
+    justify-content: left;
+    align-items: center;
+}
+
+.recipe-inputs {
+    margin-right: 5px;
+    display: flex;
+    flex-direction: right;
+    justify-content: right;
+    align-items: center;
+}
+
+.recipe-io {
+    display: flex;
+    flex-direction: right;
+}               
+
+.recipe-io-sep {
+    margin-left: 3px;
+    margin-right: 3px;
+}
+
+.recipe-io-item {
+    display: flex;
+    flex-direction: right;
+    justify-content: right;
+    align-items: center;
+    min-width: 50px;
+    margin-left: 3px;
+    margin-right: 3px;
+}
+
+.recipe-io-icon {
+    margin-left: 3px;
+    margin-right: 3px;
+    width: 20px;
+    height: 20px;
+}
+
+.base-recipes,
+.alternate-recipes {
+    flex: 1;
+    margin: 10px
 }

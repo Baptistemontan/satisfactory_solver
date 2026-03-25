@@ -20,12 +20,73 @@ pub enum Node {
     Excess { iid: ItemId, amount: f64 },
 }
 
+impl Eq for Node {}
+
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::Recipe {
+                    rid: l_rid,
+                    amount: l_amount,
+                },
+                Self::Recipe {
+                    rid: r_rid,
+                    amount: r_amount,
+                },
+            ) => l_rid == r_rid && float_eq!(l_amount, r_amount, abs <= 1e-5),
+            (
+                Self::Input {
+                    iid: l_iid,
+                    amount: l_amount,
+                },
+                Self::Input {
+                    iid: r_iid,
+                    amount: r_amount,
+                },
+            ) => l_iid == r_iid && float_eq!(l_amount, r_amount, abs <= 1e-5),
+            (
+                Self::Output {
+                    iid: l_iid,
+                    amount: l_amount,
+                },
+                Self::Output {
+                    iid: r_iid,
+                    amount: r_amount,
+                },
+            ) => l_iid == r_iid && float_eq!(l_amount, r_amount, abs <= 1e-5),
+            (
+                Self::Excess {
+                    iid: l_iid,
+                    amount: l_amount,
+                },
+                Self::Excess {
+                    iid: r_iid,
+                    amount: r_amount,
+                },
+            ) => l_iid == r_iid && float_eq!(l_amount, r_amount, abs <= 1e-5),
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Edge {
     pub from: usize,
     pub to: usize,
     pub iid: ItemId,
     pub amount: f64,
+}
+
+impl Eq for Edge {}
+
+impl PartialEq for Edge {
+    fn eq(&self, other: &Self) -> bool {
+        self.from == other.from
+            && self.to == other.to
+            && self.iid == other.iid
+            && float_eq!(self.amount, other.amount, abs <= 1e-5)
+    }
 }
 
 #[derive(Debug)]

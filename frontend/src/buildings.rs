@@ -1,6 +1,9 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
-use solver::recipe::BuildingId;
+use solver::recipe::{BuildingId, RecipeId};
 
 #[derive(Debug)]
 pub struct Building {
@@ -13,4 +16,5 @@ pub struct Building {
 #[derive(Debug, Clone)]
 pub struct Buildings {
     pub buildings: Arc<BTreeMap<BuildingId, Arc<Building>>>,
+    pub recipes: Arc<BTreeMap<BuildingId, Arc<BTreeSet<RecipeId>>>>,
 }
