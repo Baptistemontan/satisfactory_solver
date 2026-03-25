@@ -191,7 +191,7 @@ body {
     margin-right: 3px;
 }
 
-.recipe-io-icon {
+.recipe-io-icon, .item-selection-icon {
     margin-left: 3px;
     margin-right: 3px;
     width: 20px;
@@ -202,4 +202,12 @@ body {
 .alternate-recipes {
     flex: 1;
     margin: 10px
+}
+
+.item-selection {
+    margin-right: 20px;
+    display: flex;
+    flex-direction: right;
+    justify-content: right;
+    align-items: center;
 }

@@ -1,17 +1,21 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use crate::item::{ItemSelector, Items};
 use crate::recipes::RecipeTab;
 use crate::{graph_renderer::component::GraphVisualizer, recipes::Recipes};
+use leptos::either::EitherOf3;
 use leptos::{either::Either, prelude::*};
+use solver::recipe::ItemId;
 use thaw::{Button, Tab, TabList, Theme};
 
 const PRODUCTION: &str = "production";
 const RECIPES: &str = "recipes";
+const INPUTS: &str = "inputs";
 
 #[component]
 pub fn Layout(theme: RwSignal<Theme>) -> impl IntoView {
-    let selected_tab = RwSignal::new(RECIPES.to_string());
+    let selected_tab = RwSignal::new(INPUTS.to_string());
     view! {
         <div class="layout">
             <Header selected_tab=selected_tab theme=theme />
@@ -38,6 +42,9 @@ pub fn Header(selected_tab: RwSignal<String>, theme: RwSignal<Theme>) -> impl In
                 <Tab value=PRODUCTION>
                     "Production"
                 </Tab>
+                <Tab value=INPUTS>
+                    "Inputs"
+                </Tab>
                 <Tab value=RECIPES>
                     "Recipes"
                 </Tab>
@@ -57,6 +64,13 @@ pub fn Header(selected_tab: RwSignal<String>, theme: RwSignal<Theme>) -> impl In
 #[component]
 pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
     let recipes = expect_context::<Recipes>();
+    let items = expect_context::<Items>();
+    let selected_items = items
+        .items
+        .keys()
+        .map(|iid| (*iid, RwSignal::new(false)))
+        .collect::<BTreeMap<_, _>>();
+    let selected_items = Arc::new(selected_items);
     let selected_recipes = recipes
         .recipes
         .keys()
@@ -67,15 +81,18 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
         let tab = selected_tab.get();
         let selected_recipes = selected_recipes.clone();
         match tab.as_str() {
-            PRODUCTION => Either::Left(view! {
+            PRODUCTION => EitherOf3::A(view! {
                 <ContentInner>
                     <GraphVisualizer selected_recipes=selected_recipes />
                 </ContentInner>
             }),
-            RECIPES => Either::Right(view! {
+            RECIPES => EitherOf3::B(view! {
                 <ContentInner>
                     <RecipeTab selected_recipes=selected_recipes />
                 </ContentInner>
+            }),
+            INPUTS => EitherOf3::C(view! {
+                <ItemSelector items={items.clone()} selected_items={selected_items.clone()} />
             }),
             _ => unreachable!(),
         }

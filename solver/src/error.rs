@@ -11,6 +11,8 @@ pub enum Error<S: LPSolver> {
     SolverError(LPError<S>),
     #[error("No recipe for item with id {0:#?}")]
     NoRecipe(ItemId),
+    #[error("No target set for the solver")]
+    NoTarget,
 }
 
 macro_rules! try_solver_err {

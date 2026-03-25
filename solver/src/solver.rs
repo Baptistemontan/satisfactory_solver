@@ -127,6 +127,10 @@ impl Solver {
         targets: &[Target],
         availables: &BTreeMap<ItemId, Quantity>,
     ) -> SolutionResult<S> {
+        if targets.is_empty() {
+            return Err(Error::NoTarget);
+        }
+
         let mut set_targets = targets
             .iter()
             .filter_map(|target| Some((target.iid, target.qty?)))
