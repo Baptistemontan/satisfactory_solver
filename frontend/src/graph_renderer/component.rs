@@ -2,18 +2,16 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use leptos::{either::Either, prelude::*};
 
-use super::{Graph, VisualGraph};
-use core::f64;
+use super::Graph;
 use solver::{
     SOLVER,
-    quantity::Quantity,
-    recipe::{ItemId, Recipe as SolverRecipe, RecipeId},
+    recipe::{ItemId, RecipeId},
     solver::{Solver, Target},
 };
 
-use graph::Graph as SolvedGraph;
+use solver::graph::Graph as SolvedGraph;
 
-use crate::{graph_renderer::SerializableGraph, item::AmountState, parser, recipes::Recipes};
+use crate::{graph_renderer::SerializableGraph, item::AmountState, recipes::Recipes};
 
 #[component]
 pub fn GraphVisualizer(
@@ -22,18 +20,6 @@ pub fn GraphVisualizer(
     targets: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>,
 ) -> impl IntoView {
     let recipes = expect_context::<Recipes>();
-
-    let iron_plate_recipe_id = RecipeId(0);
-    let iron_plate_item_id = ItemId(4);
-    let plastic_item_id = ItemId(59);
-
-    let iron_ingot_recipe_id = RecipeId(2);
-    let iron_ore_item_id = ItemId(137);
-
-    let target = Target {
-        iid: plastic_item_id,
-        qty: None,
-    };
 
     let graph = Memo::new(move |_| {
         let mut solver_recipes = BTreeMap::new();
@@ -46,14 +32,14 @@ pub fn GraphVisualizer(
         let mut availables = BTreeMap::new();
         for (iid, qty) in &*available_items {
             if let AmountState::Some(qty) = qty.get() {
-                availables.insert(*iid, Quantity(qty));
+                availables.insert(*iid, qty);
             }
         }
         let mut solve_for = Vec::new();
         for (iid, qty) in &*targets {
             let target_qty = match qty.get() {
                 AmountState::Maximize(_) => None,
-                AmountState::Some(qty) => Some(Quantity(qty)),
+                AmountState::Some(qty) => Some(qty),
                 _ => continue,
             };
             solve_for.push(Target {
@@ -62,9 +48,17 @@ pub fn GraphVisualizer(
             });
         }
 
-        let solution = Solver::new(&solver_recipes)
-            .optimize(SOLVER, &solve_for, &availables)
-            .ok()?;
+        leptos::logging::log!("{:?}", solve_for);
+
+        let solution = Solver::new(&solver_recipes).optimize(SOLVER, &solve_for, &availables);
+
+        let solution = match solution {
+            Ok(sol) => sol,
+            Err(err) => {
+                leptos::logging::log!("error: {}", err);
+                return None;
+            }
+        };
 
         let graph = SolvedGraph::build_from_solution(&solution, &solve_for, &solver_recipes);
 

@@ -4,13 +4,13 @@ use std::{
     sync::Arc,
 };
 
-use float_eq::float_eq;
-use good_lp::Solver as LPSolver;
-use solver::{
-    quantity::Quantity,
+use crate::{
+    PRECISION,
     recipe::{ItemId, Recipe, RecipeId},
     solver::{Solution, Target},
 };
+use float_eq::float_eq;
+use good_lp::Solver as LPSolver;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Node {
@@ -34,7 +34,7 @@ impl PartialEq for Node {
                     rid: r_rid,
                     amount: r_amount,
                 },
-            ) => l_rid == r_rid && float_eq!(l_amount, r_amount, abs <= 1e-5),
+            ) => l_rid == r_rid && float_eq!(l_amount, r_amount, rmax <= PRECISION),
             (
                 Self::Input {
                     iid: l_iid,
@@ -44,7 +44,7 @@ impl PartialEq for Node {
                     iid: r_iid,
                     amount: r_amount,
                 },
-            ) => l_iid == r_iid && float_eq!(l_amount, r_amount, abs <= 1e-5),
+            ) => l_iid == r_iid && float_eq!(l_amount, r_amount, rmax <= PRECISION),
             (
                 Self::Output {
                     iid: l_iid,
@@ -54,7 +54,7 @@ impl PartialEq for Node {
                     iid: r_iid,
                     amount: r_amount,
                 },
-            ) => l_iid == r_iid && float_eq!(l_amount, r_amount, abs <= 1e-5),
+            ) => l_iid == r_iid && float_eq!(l_amount, r_amount, rmax <= PRECISION),
             (
                 Self::Excess {
                     iid: l_iid,
@@ -64,7 +64,7 @@ impl PartialEq for Node {
                     iid: r_iid,
                     amount: r_amount,
                 },
-            ) => l_iid == r_iid && float_eq!(l_amount, r_amount, abs <= 1e-5),
+            ) => l_iid == r_iid && float_eq!(l_amount, r_amount, rmax <= PRECISION),
             _ => false,
         }
     }
@@ -85,7 +85,7 @@ impl PartialEq for Edge {
         self.from == other.from
             && self.to == other.to
             && self.iid == other.iid
-            && float_eq!(self.amount, other.amount, abs <= 1e-5)
+            && float_eq!(self.amount, other.amount, rmax <= PRECISION)
     }
 }
 
@@ -221,13 +221,13 @@ fn spawn_recipes(
 
             let coef = 60. / recipe.time;
 
-            for (iid, Quantity(qty)) in &recipe.outputs {
+            for (iid, qty) in &recipe.outputs {
                 excess
                     .entry(*iid)
                     .or_default()
                     .push((recipe_node_idx, *qty * *amount * coef));
             }
-            for (iid, Quantity(qty)) in &recipe.inputs {
+            for (iid, qty) in &recipe.inputs {
                 item_queue.push_back((*iid, recipe_node_idx, *qty * *amount * coef));
             }
         }
@@ -249,7 +249,7 @@ fn connect_to_recipes(
                 excess.remove();
                 break;
             };
-            if float_eq!(feedback_qty, qty, abs <= 1e-5) {
+            if float_eq!(feedback_qty, qty, rmax <= PRECISION) {
                 if values.is_empty() {
                     excess.remove();
                 }
@@ -284,7 +284,8 @@ fn connect_to_recipes(
     }
     if qty >= 1e-5 {
         let Some((input_node_idx, input_qty)) = input_nodes.get_mut(&current_item_id) else {
-            todo!("?");
+            // TODO: fucking floats man ...
+            return;
         };
         *input_qty -= qty;
         edges.push(Edge {
@@ -368,7 +369,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use solver::{
+    use crate::{
         SOLVER,
         recipe::BuildingId,
         solver::{Solver, Target},
@@ -385,23 +386,19 @@ mod tests {
         let iron_ingot_recipe_id = RecipeId(0);
         let iron_plate_recipe_id = RecipeId(1);
         let iron_ingot_recipe = Arc::new(Recipe {
-            inputs: BTreeMap::from([(iron_ore, Quantity(1.))]),
-            outputs: BTreeMap::from([(iron_ingot, Quantity(1.))]),
+            inputs: BTreeMap::from([(iron_ore, 1.)]),
+            outputs: BTreeMap::from([(iron_ingot, 1.)]),
             time: 2.,
             building: BuildingId(0),
         });
         let iron_plate_recipe = Arc::new(Recipe {
-            inputs: BTreeMap::from([(iron_ingot, Quantity(3.))]),
-            outputs: BTreeMap::from([
-                (iron_plate, Quantity(2.)),
-                (iron_ore, Quantity(1.)),
-                (w_id, Quantity(1.)),
-            ]),
+            inputs: BTreeMap::from([(iron_ingot, 3.)]),
+            outputs: BTreeMap::from([(iron_plate, 2.), (iron_ore, 1.), (w_id, 1.)]),
             time: 6.,
             building: BuildingId(0),
         });
 
-        let availables = BTreeMap::from([(iron_ore, Quantity(available_ores))]);
+        let availables = BTreeMap::from([(iron_ore, available_ores)]);
         let recipes = BTreeMap::from([
             (iron_ingot_recipe_id, iron_ingot_recipe),
             (iron_plate_recipe_id, iron_plate_recipe),

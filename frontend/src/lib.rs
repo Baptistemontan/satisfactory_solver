@@ -9,17 +9,8 @@ mod parser;
 mod recipes;
 mod utils;
 
-use graph_renderer::Graph;
 use layout::Layout;
-use solver::{
-    SOLVER,
-    quantity::Quantity,
-    recipe::{ItemId, RecipeId},
-    solver::{Solver, Target},
-};
 use thaw::{ConfigProvider, Theme};
-
-use crate::graph_renderer::VisualGraph;
 
 const DATA: &str = include_str!("../../data/data.json");
 const DEFAULT_BASE_URL: &str = "/";

@@ -2,8 +2,6 @@ use std::collections::BTreeMap;
 
 use good_lp::{Expression, Variable};
 
-use crate::quantity::Quantity;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ItemId(pub usize);
 
@@ -15,8 +13,8 @@ pub struct BuildingId(pub usize);
 
 #[derive(Debug, Clone)]
 pub struct Recipe {
-    pub inputs: BTreeMap<ItemId, Quantity>,
-    pub outputs: BTreeMap<ItemId, Quantity>,
+    pub inputs: BTreeMap<ItemId, f64>,
+    pub outputs: BTreeMap<ItemId, f64>,
     pub time: f64,
     pub building: BuildingId,
 }

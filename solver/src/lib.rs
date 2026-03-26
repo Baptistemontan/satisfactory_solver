@@ -1,7 +1,9 @@
 pub mod error;
-pub mod quantity;
+pub mod graph;
 pub mod recipe;
 pub mod solver;
+
+pub(crate) const PRECISION: f64 = 1e-3;
 
 #[cfg(feature = "microlp")]
 pub const SOLVER: fn(
@@ -17,7 +19,6 @@ pub const SOLVER: fn(
 mod tests {
     use super::SOLVER;
     use crate::{
-        quantity::Quantity,
         recipe::{BuildingId, ItemId, Recipe, RecipeId},
         solver::{Solver, Target},
     };
@@ -33,19 +34,19 @@ mod tests {
         let iron_ingot_recipe_id = RecipeId(0);
         let iron_plate_recipe_id = RecipeId(1);
         let iron_ingot_recipe = Arc::new(Recipe {
-            inputs: BTreeMap::from([(iron_ore, Quantity(1.))]),
-            outputs: BTreeMap::from([(iron_ingot, Quantity(1.))]),
+            inputs: BTreeMap::from([(iron_ore, 1.)]),
+            outputs: BTreeMap::from([(iron_ingot, 1.)]),
             time: 2.,
             building: BuildingId(0),
         });
         let iron_plate_recipe = Arc::new(Recipe {
-            inputs: BTreeMap::from([(iron_ingot, Quantity(3.))]),
-            outputs: BTreeMap::from([(iron_plate, Quantity(2.))]),
+            inputs: BTreeMap::from([(iron_ingot, 3.)]),
+            outputs: BTreeMap::from([(iron_plate, 2.)]),
             time: 6.,
             building: BuildingId(0),
         });
 
-        let availables = BTreeMap::from([(iron_ore, Quantity(f64::INFINITY))]);
+        let availables = BTreeMap::from([(iron_ore, f64::INFINITY)]);
         let recipes = BTreeMap::from([
             (iron_ingot_recipe_id, iron_ingot_recipe),
             (iron_plate_recipe_id, iron_plate_recipe),
@@ -53,7 +54,7 @@ mod tests {
         let target_qty = 35.;
         let target = Target {
             iid: iron_plate,
-            qty: Some(target_qty.into()),
+            qty: Some(target_qty),
         };
 
         let solution = Solver::new(&recipes)
@@ -88,19 +89,19 @@ mod tests {
         let iron_ingot_recipe_id = RecipeId(0);
         let iron_plate_recipe_id = RecipeId(1);
         let iron_ingot_recipe = Arc::new(Recipe {
-            inputs: BTreeMap::from([(iron_ore, Quantity(1.))]),
-            outputs: BTreeMap::from([(iron_ingot, Quantity(1.))]),
+            inputs: BTreeMap::from([(iron_ore, 1.)]),
+            outputs: BTreeMap::from([(iron_ingot, 1.)]),
             time: 2.,
             building: BuildingId(0),
         });
         let iron_plate_recipe = Arc::new(Recipe {
-            inputs: BTreeMap::from([(iron_ingot, Quantity(3.))]),
-            outputs: BTreeMap::from([(iron_plate, Quantity(2.))]),
+            inputs: BTreeMap::from([(iron_ingot, 3.)]),
+            outputs: BTreeMap::from([(iron_plate, 2.)]),
             time: 6.,
             building: BuildingId(0),
         });
 
-        let availables = BTreeMap::from([(iron_ore, Quantity(available_ores))]);
+        let availables = BTreeMap::from([(iron_ore, available_ores)]);
         let recipes = BTreeMap::from([
             (iron_ingot_recipe_id, iron_ingot_recipe),
             (iron_plate_recipe_id, iron_plate_recipe),
@@ -140,12 +141,12 @@ mod tests {
         let item2 = ItemId(1);
         let recipe_id = RecipeId(0);
         let recipe = Arc::new(Recipe {
-            inputs: BTreeMap::from([(item1, Quantity(2.))]),
-            outputs: BTreeMap::from([(item1, Quantity(1.)), (item2, Quantity(1.))]),
+            inputs: BTreeMap::from([(item1, 2.)]),
+            outputs: BTreeMap::from([(item1, 1.), (item2, 1.)]),
             time: 60.,
             building: BuildingId(0),
         });
-        let availables = BTreeMap::from([(item1, Quantity(available_item))]);
+        let availables = BTreeMap::from([(item1, available_item)]);
         let recipes = BTreeMap::from([(recipe_id, recipe)]);
         let target = Target {
             iid: item2,
@@ -178,8 +179,8 @@ mod tests {
         let item2 = ItemId(1);
         let recipe_id = RecipeId(0);
         let recipe = Arc::new(Recipe {
-            inputs: BTreeMap::from([(item1, Quantity(1.))]),
-            outputs: BTreeMap::from([(item1, Quantity(1.)), (item2, Quantity(1.))]),
+            inputs: BTreeMap::from([(item1, 1.)]),
+            outputs: BTreeMap::from([(item1, 1.), (item2, 1.)]),
             time: 60.,
             building: BuildingId(0),
         });
@@ -189,7 +190,7 @@ mod tests {
         let qty = f64::MAX;
         let target = Target {
             iid: item2,
-            qty: Some(qty.into()),
+            qty: Some(qty),
         };
 
         let solution = Solver::new(&recipes)

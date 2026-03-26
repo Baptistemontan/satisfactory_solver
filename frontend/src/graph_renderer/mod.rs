@@ -13,6 +13,7 @@ use leptos::{
     ev::{MouseEvent, WheelEvent},
     prelude::*,
 };
+use solver::graph;
 use solver::recipe::{BuildingId, ItemId, RecipeId};
 use web_sys::wasm_bindgen::JsCast;
 
@@ -76,7 +77,7 @@ impl NodeData {
                 recipe
                     .inputs()
                     .iter()
-                    .map(|(iid, qty)| (*iid, coef * qty.0))
+                    .map(|(iid, qty)| (*iid, coef * *qty))
                     .collect()
             }
             graph::Node::Output { iid, amount } | graph::Node::Excess { iid, amount } => {
@@ -94,7 +95,7 @@ impl NodeData {
                 recipe
                     .outputs()
                     .iter()
-                    .map(|(iid, qty)| (*iid, coef * qty.0))
+                    .map(|(iid, qty)| (*iid, coef * *qty))
                     .collect()
             }
             graph::Node::Input { iid, amount } => Arc::from([(iid, amount)]),
@@ -164,10 +165,10 @@ fn sort_nodes(graph: &SolvedGraph) -> Arc<[SNode]> {
     let mut nodes = Vec::new();
 
     for (node_id, node) in graph.nodes().iter().enumerate() {
-        let level = levels.get(&node_id).unwrap();
-        let y = &mut level_y[*level];
+        let level = levels.get(&node_id).copied().unwrap_or(0);
+        let y = &mut level_y[level];
         let node_y = *y;
-        let node_x = 100.0 + ((NODE_WIDTH as f64) + POSITION_INCREMENT * 5.0) * (*level as f64);
+        let node_x = 100.0 + ((NODE_WIDTH as f64) + POSITION_INCREMENT * 5.0) * (level as f64);
         let size = match node {
             graph::Node::Recipe { rid, .. } => {
                 let recipe = get_recipe(*rid);

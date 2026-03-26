@@ -591,7 +591,6 @@ version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "float_eq",
- "graph",
  "icondata",
  "leptos",
  "serde",
@@ -770,15 +769,6 @@ dependencies = [
  "clarabel",
  "fnv",
  "microlp",
-]
-
-[[package]]
-name = "graph"
-version = "0.1.0"
-dependencies = [
- "float_eq",
- "good_lp",
- "solver",
 ]
 
 [[package]]
@@ -2194,6 +2184,7 @@ version = "0.1.0"
 dependencies = [
  "float_eq",
  "good_lp",
+ "leptos",
  "thiserror 2.0.18",
 ]
 

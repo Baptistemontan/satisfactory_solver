@@ -1,6 +1,6 @@
 use crate::{
-    error::{Error, Result, try_solver_err},
-    quantity::Quantity,
+    PRECISION,
+    error::{Error, Result},
     recipe::{ItemId, Recipe, RecipeId},
 };
 use good_lp::{
@@ -23,7 +23,7 @@ pub struct Solver {
 #[derive(Debug, Clone, Copy)]
 pub struct Target {
     pub iid: ItemId,
-    pub qty: Option<Quantity>,
+    pub qty: Option<f64>,
 }
 
 pub type LPSolution<S> = <<S as LPSolver>::Model as SolverModel>::Solution;
@@ -60,8 +60,8 @@ impl Solver {
         self,
         solver: S,
         maximize_target: Option<ItemId>,
-        constraints: &BTreeMap<ItemId, Quantity>,
-        availables: &BTreeMap<ItemId, Quantity>,
+        constraints: &BTreeMap<ItemId, f64>,
+        availables: &BTreeMap<ItemId, f64>,
     ) -> SolutionResult<S> {
         let Self {
             mut vars,
@@ -92,11 +92,14 @@ impl Solver {
             };
             vars.maximise(target_sink).using(solver)
         } else {
-            let mut inputs_expr = Expression::from(0.0);
+            let mut minimize_expr = Expression::from(0.0);
             for input_var in input_vars.values() {
-                inputs_expr += input_var;
+                minimize_expr += input_var;
             }
-            vars.minimise(inputs_expr).using(solver)
+            for recipe_var in recipes_vars.values() {
+                minimize_expr += recipe_var;
+            }
+            vars.minimise(minimize_expr).using(solver)
         };
 
         for (iid, qty) in constraints {
@@ -111,7 +114,10 @@ impl Solver {
             problem = problem.with(expr.eq(0));
         }
 
-        let solution = try_solver_err!(problem.solve());
+        let solution = match problem.solve() {
+            Ok(sol) => sol,
+            Err(err) => return Err(Error::SolverError(err)),
+        };
 
         Ok(Solution {
             solution,
@@ -125,7 +131,7 @@ impl Solver {
         self,
         solver: S,
         targets: &[Target],
-        availables: &BTreeMap<ItemId, Quantity>,
+        availables: &BTreeMap<ItemId, f64>,
     ) -> SolutionResult<S> {
         if targets.is_empty() {
             return Err(Error::NoTarget);
@@ -134,7 +140,7 @@ impl Solver {
         let mut set_targets = targets
             .iter()
             .filter_map(|target| Some((target.iid, target.qty?)))
-            .collect::<BTreeMap<ItemId, Quantity>>();
+            .collect::<BTreeMap<ItemId, f64>>();
 
         let mut to_maximize = targets
             .iter()
@@ -143,6 +149,7 @@ impl Solver {
             .collect::<VecDeque<_>>();
 
         while let Some(target) = to_maximize.pop_front() {
+            leptos::logging::log!("maximizing {:?}", target);
             let solution =
                 self.clone()
                     .solve(solver.clone(), Some(target), &set_targets, availables)?;
@@ -150,6 +157,7 @@ impl Solver {
                 todo!("target {:#?} sink not found", target);
             };
             let maximized = solution.solution.value(*target_sink);
+            leptos::logging::log!("found max: {}", maximized);
             let set_target = set_targets.entry(target).or_default();
             *set_target += maximized;
         }
@@ -166,7 +174,7 @@ impl<S: LPSolver> Solution<S> {
                 let qty = self.solution.value(*var);
                 (*iid, qty)
             })
-            .filter(|(_, qty)| qty.abs() >= 1e-5)
+            .filter(|(_, qty)| qty.abs() >= PRECISION)
             .collect()
     }
 
@@ -177,7 +185,7 @@ impl<S: LPSolver> Solution<S> {
                 let qty = self.solution.value(*var);
                 (*iid, qty)
             })
-            .filter(|(_, qty)| qty.abs() >= 1e-5)
+            .filter(|(_, qty)| qty.abs() >= PRECISION)
             .collect()
     }
 
@@ -188,7 +196,7 @@ impl<S: LPSolver> Solution<S> {
                 let qty = self.solution.value(*var);
                 (*iid, qty)
             })
-            .filter(|(_, qty)| qty.abs() >= 1e-5)
+            .filter(|(_, qty)| qty.abs() >= PRECISION)
             .collect()
     }
 }

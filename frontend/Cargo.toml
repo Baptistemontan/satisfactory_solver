@@ -9,7 +9,6 @@ readme = "../README.md"
 
 [dependencies]
 leptos = { workspace = true, features = ["csr"] }
-graph = { workspace = true }
 solver = { workspace = true }
 web-sys = { workspace = true }
 serde = { workspace = true }

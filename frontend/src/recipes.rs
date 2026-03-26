@@ -3,10 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use solver::{
-    quantity::Quantity,
-    recipe::{ItemId, Recipe as SolverRecipe, RecipeId},
-};
+use solver::recipe::{ItemId, Recipe as SolverRecipe, RecipeId};
 
 use leptos::prelude::*;
 use thaw::{BackTop, Button, Checkbox, Divider, Input, Scrollbar, Tooltip};
@@ -24,11 +21,11 @@ pub struct Recipe {
 }
 
 impl Recipe {
-    pub fn inputs(&self) -> &BTreeMap<ItemId, Quantity> {
+    pub fn inputs(&self) -> &BTreeMap<ItemId, f64> {
         &self.inner.inputs
     }
 
-    pub fn outputs(&self) -> &BTreeMap<ItemId, Quantity> {
+    pub fn outputs(&self) -> &BTreeMap<ItemId, f64> {
         &self.inner.outputs
     }
 
@@ -45,13 +42,6 @@ pub struct Recipes {
 impl Recipes {
     pub fn get(&self, rid: RecipeId) -> Option<Arc<Recipe>> {
         self.recipes.get(&rid).cloned()
-    }
-
-    pub fn default_selected_recipes(&self) -> BTreeMap<RecipeId, Arc<SolverRecipe>> {
-        self.recipes
-            .iter()
-            .map(|(rid, r)| (*rid, r.inner.clone()))
-            .collect()
     }
 }
 
@@ -219,10 +209,10 @@ pub fn RecipePicker(
     }
 }
 
-fn display_io(items: &Items, io: &BTreeMap<ItemId, Quantity>) -> Option<impl IntoView + use<>> {
+fn display_io(items: &Items, io: &BTreeMap<ItemId, f64>) -> Option<impl IntoView + use<>> {
     let mut items = io
         .iter()
-        .filter_map(|(iid, qty)| Some((items.items.get(iid)?.clone(), qty.0 as i32)));
+        .filter_map(|(iid, qty)| Some((items.items.get(iid)?.clone(), *qty as i32)));
 
     let (first_item, first_qty) = items.next()?;
     let first = display_item(first_item, first_qty);

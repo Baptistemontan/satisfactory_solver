@@ -1,12 +1,12 @@
-use core::f64;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use crate::DATA;
 use crate::item::{AmountState, InputTab, Items, OutputsTab};
 use crate::recipes::RecipeTab;
 use crate::{graph_renderer::component::GraphVisualizer, recipes::Recipes};
 use leptos::either::EitherOf4;
-use leptos::{either::Either, prelude::*};
+use leptos::prelude::*;
 use solver::recipe::ItemId;
 use thaw::{Button, Tab, TabList, Theme};
 
@@ -98,8 +98,11 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
     /* setup */
 
     let plastic_item_id = ItemId(59);
+    let turbo_motor_iid = ItemId(38);
 
-    targets.insert(plastic_item_id, RwSignal::new(AmountState::Maximize(0.0)));
+    leptos::logging::log!("{:#?}", items);
+
+    targets.insert(turbo_motor_iid, RwSignal::new(AmountState::Maximize(623.0)));
 
     // let crude_oil_id = ItemId(149);
     // let water_id = ItemId(139);

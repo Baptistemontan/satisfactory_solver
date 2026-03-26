@@ -9,14 +9,11 @@ use serde::{
     Deserialize,
     de::{DeserializeOwned, DeserializeSeed, IgnoredAny, Visitor},
 };
-use solver::{
-    quantity::Quantity,
-    recipe::{BuildingId, ItemId, Recipe as SolverRecipe, RecipeId},
-};
+use solver::recipe::{BuildingId, ItemId, Recipe as SolverRecipe, RecipeId};
 
 use crate::{
     buildings::{Building, Buildings},
-    item::{self, Item, Items},
+    item::{Item, Items},
     recipes::{Recipe, Recipes},
 };
 
@@ -422,7 +419,7 @@ struct RecipeIoSeed<'a> {
 }
 
 impl<'de> DeserializeSeed<'de> for RecipeIoSeed<'_> {
-    type Value = BTreeMap<ItemId, Quantity>;
+    type Value = BTreeMap<ItemId, f64>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -433,7 +430,7 @@ impl<'de> DeserializeSeed<'de> for RecipeIoSeed<'_> {
 }
 
 impl<'de> Visitor<'de> for RecipeIoSeed<'_> {
-    type Value = BTreeMap<ItemId, Quantity>;
+    type Value = BTreeMap<ItemId, f64>;
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
     where
@@ -466,7 +463,7 @@ struct RecipeIoInner<'a> {
 }
 
 impl<'de> DeserializeSeed<'de> for RecipeIoInner<'_> {
-    type Value = (ItemId, Quantity);
+    type Value = (ItemId, f64);
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -477,7 +474,7 @@ impl<'de> DeserializeSeed<'de> for RecipeIoInner<'_> {
 }
 
 impl<'de> Visitor<'de> for RecipeIoInner<'_> {
-    type Value = (ItemId, Quantity);
+    type Value = (ItemId, f64);
 
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
     where
@@ -503,7 +500,7 @@ impl<'de> Visitor<'de> for RecipeIoInner<'_> {
             }
         };
         let qty = amount.unwrap();
-        Ok((item_id, Quantity(qty)))
+        Ok((item_id, qty))
     }
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

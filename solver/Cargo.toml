@@ -12,8 +12,10 @@ readme = "../README.md"
 good_lp = { workspace = true }
 float_eq = { workspace = true }
 thiserror = { workspace = true }
+leptos = { workspace = true }
 
 [features]
-default = ["microlp"]
+default = ["clarabel"]
+# default = ["microlp"]
 microlp = ["good_lp/microlp"]
 clarabel = ["good_lp/clarabel"]

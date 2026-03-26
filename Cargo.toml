@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["frontend", "graph", "solver"]
+members = ["frontend", "solver"]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,7 +9,6 @@ version = "0.1.0"
 
 # -- members --
 solver = { path = "./solver" }
-graph = { path = "./graph" }
 
 # -- deps --
 good_lp = { version = "=1.14", default-features = false }

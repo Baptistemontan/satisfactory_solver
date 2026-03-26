@@ -3,7 +3,7 @@ use std::{
     mem,
 };
 
-use graph::{Edge, Graph, Node as GNode};
+use solver::graph::{Edge, Graph, Node as GNode};
 
 fn cycle_removal(
     nodes: &[GNode],
@@ -193,7 +193,9 @@ fn update_cycles_level(
         let current_level = levels[cycle_node];
         let diff = cycle_edges.get(cycle_node).unwrap().difference(cycle_with);
         for parent in diff {
-            let parent_level = levels.get(parent).unwrap();
+            let Some(parent_level) = levels.get(parent) else {
+                continue;
+            };
             if *parent_level <= current_level + 1 {
                 continue 'outer;
             }

@@ -14,14 +14,3 @@ pub enum Error<S: LPSolver> {
     #[error("No target set for the solver")]
     NoTarget,
 }
-
-macro_rules! try_solver_err {
-    ($x: expr) => {
-        match $x {
-            Ok(v) => v,
-            Err(err) => return Err($crate::error::Error::SolverError(err)),
-        }
-    };
-}
-
-pub(crate) use try_solver_err;

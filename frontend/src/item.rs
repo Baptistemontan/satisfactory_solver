@@ -3,15 +3,11 @@ use std::{
     sync::Arc,
 };
 
-use solver::{quantity::Quantity, recipe::ItemId};
+use solver::recipe::ItemId;
 
-use crate::{BASE_URL, utils::ArcIter};
+use crate::BASE_URL;
 use leptos::{either::Either, prelude::*};
-use thaw::{
-    BackTop, Button, ButtonAppearance, Checkbox, Divider, DrawerBody, DrawerHeader,
-    DrawerHeaderTitle, DrawerHeaderTitleAction, DrawerSize, Input, OverlayDrawer, Scrollbar,
-    SpinButton, Switch, Tooltip,
-};
+use thaw::{BackTop, Button, Checkbox, Divider, Input, Scrollbar, SpinButton, Switch, Tooltip};
 
 #[derive(Debug)]
 pub struct Item {
