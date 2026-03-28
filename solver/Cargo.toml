@@ -13,6 +13,7 @@ good_lp = { workspace = true }
 float_eq = { workspace = true }
 thiserror = { workspace = true }
 leptos = { workspace = true }
+fixed = { workspace = true }
 
 [features]
 default = ["clarabel"]

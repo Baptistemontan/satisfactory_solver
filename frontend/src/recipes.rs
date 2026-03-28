@@ -3,7 +3,10 @@ use std::{
     sync::Arc,
 };
 
-use solver::recipe::{ItemId, Recipe as SolverRecipe, RecipeId};
+use solver::{
+    Fl,
+    recipe::{ItemId, Recipe as SolverRecipe, RecipeId},
+};
 
 use leptos::prelude::*;
 use thaw::{BackTop, Button, Checkbox, Divider, Input, Scrollbar, Tooltip};

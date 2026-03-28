@@ -26,3 +26,4 @@ console_error_panic_hook = { version = "0.1" }
 thaw = { version = "0.5.0-beta" }
 yoke = { version = "0.8" }
 icondata = { version = "0.7" }
+fixed = { version = "1.31" }

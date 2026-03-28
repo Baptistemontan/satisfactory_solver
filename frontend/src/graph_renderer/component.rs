@@ -6,7 +6,7 @@ use super::Graph;
 use solver::{
     SOLVER,
     recipe::{ItemId, RecipeId},
-    solver::{Solver, Target},
+    solver::{Target, optimize},
 };
 
 use solver::graph::Graph as SolvedGraph;
@@ -50,7 +50,7 @@ pub fn GraphVisualizer(
 
         leptos::logging::log!("{:?}", solve_for);
 
-        let solution = Solver::new(&solver_recipes).optimize(SOLVER, &solve_for, &availables);
+        let solution = optimize(SOLVER, &solve_for, &mut solver_recipes, availables);
 
         let solution = match solution {
             Ok(sol) => sol,

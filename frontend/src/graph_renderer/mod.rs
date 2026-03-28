@@ -73,7 +73,7 @@ impl NodeData {
         match self.0 {
             graph::Node::Recipe { rid, amount } => {
                 let recipe = get_recipe(rid);
-                let coef = (60.0 / recipe.time()) * amount;
+                let coef = (60.0 / recipe.time()) * amount.to_num::<f64>();
                 recipe
                     .inputs()
                     .iter()
@@ -81,7 +81,7 @@ impl NodeData {
                     .collect()
             }
             graph::Node::Output { iid, amount } | graph::Node::Excess { iid, amount } => {
-                Arc::from([(iid, amount)])
+                Arc::from([(iid, amount.to_num())])
             }
             graph::Node::Input { .. } => Arc::default(),
         }
@@ -91,24 +91,24 @@ impl NodeData {
         match self.0 {
             graph::Node::Recipe { rid, amount } => {
                 let recipe = get_recipe(rid);
-                let coef = (60.0 / recipe.time()) * amount;
+                let coef = (60.0 / recipe.time()) * amount.to_num::<f64>();
                 recipe
                     .outputs()
                     .iter()
                     .map(|(iid, qty)| (*iid, coef * *qty))
                     .collect()
             }
-            graph::Node::Input { iid, amount } => Arc::from([(iid, amount)]),
+            graph::Node::Input { iid, amount } => Arc::from([(iid, amount.to_num())]),
             graph::Node::Output { .. } | graph::Node::Excess { .. } => Arc::default(),
         }
     }
 
     pub fn amount(self) -> f64 {
         match self.0 {
-            graph::Node::Recipe { amount, .. } => amount,
-            graph::Node::Input { amount, .. } => amount,
-            graph::Node::Output { amount, .. } => amount,
-            graph::Node::Excess { amount, .. } => amount,
+            graph::Node::Recipe { amount, .. } => amount.to_num(),
+            graph::Node::Input { amount, .. } => amount.to_num(),
+            graph::Node::Output { amount, .. } => amount.to_num(),
+            graph::Node::Excess { amount, .. } => amount.to_num(),
         }
     }
 
@@ -530,7 +530,12 @@ fn compute_offset(node: Node, iid: ItemId, input: bool) -> (i32, i32) {
     let io = if input { &outputs } else { &inputs };
 
     let Some(pos) = io.iter().position(|(a, _)| *a == iid) else {
-        todo!("item {:?} not found in node {:?} outputs", iid, node);
+        todo!(
+            "item {:?} not found in node {:?} outputs, io: {:?}",
+            iid,
+            node,
+            io
+        );
     };
     let y = compute_io_y_offset(pos, io.len(), size);
     let x = if input {

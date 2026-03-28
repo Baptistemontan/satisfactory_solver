@@ -100,7 +100,7 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
     let plastic_item_id = ItemId(59);
     let turbo_motor_iid = ItemId(38);
 
-    leptos::logging::log!("{:#?}", items);
+    // leptos::logging::log!("{:#?}", items);
 
     targets.insert(turbo_motor_iid, RwSignal::new(AmountState::Maximize(623.0)));
 
