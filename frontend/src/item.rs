@@ -117,8 +117,10 @@ pub fn InputTab(available_items_signal: RwSignal<Vec<(ItemId, AmountState)>>) ->
 
     Effect::new(move |_| {
         let selected_items = item_selection.read();
+        let ressources = ressources.read();
         let new_targets = selected_items
             .iter()
+            .chain(ressources.iter())
             .map(|(iid, v)| (*iid, v.get()))
             .collect();
         available_items_signal.set(new_targets);
