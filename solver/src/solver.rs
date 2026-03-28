@@ -1,12 +1,11 @@
 use crate::{
-    Fl, PRECISION,
     error::{Error, Result},
     recipe::{ItemId, Recipe, RecipeId},
     solution::{Solution, SolutionResult},
 };
 use good_lp::{
-    Constraint, Expression, ProblemVariables, Solution as GLPSolution, Solver as LPSolver,
-    SolverModel, Variable, constraint, variable, variables,
+    Expression, Solution as GLPSolution, Solver as LPSolver, SolverModel, Variable, variable,
+    variables,
 };
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},

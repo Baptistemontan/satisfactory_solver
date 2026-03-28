@@ -1,12 +1,11 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
 
 use good_lp::{Solution as LPSol, Solver as LPSolver, SolverModel, Variable};
 
 use crate::{
     Fl,
     error::Result,
-    recipe::{ItemId, Recipe, RecipeId},
-    solver::Target,
+    recipe::{ItemId, RecipeId},
 };
 
 pub type LPSolution<S> = <<S as LPSolver>::Model as SolverModel>::Solution;

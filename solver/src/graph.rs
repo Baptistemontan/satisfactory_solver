@@ -1,6 +1,5 @@
 use std::{
-    cmp::Reverse,
-    collections::{BTreeMap, BTreeSet, HashMap, VecDeque, btree_map::Entry},
+    collections::{BTreeMap, VecDeque, btree_map::Entry},
     fmt::Display,
     sync::Arc,
 };
@@ -11,9 +10,6 @@ use crate::{
     solution::Solution,
     solver::Target,
 };
-use fixed::{FixedU64, traits::Fixed, types::extra::U10};
-use float_eq::float_eq;
-use good_lp::Solver as LPSolver;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Node {

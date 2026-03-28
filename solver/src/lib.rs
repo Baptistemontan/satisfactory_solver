@@ -1,12 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 
-use fixed::{
-    FixedI128, FixedU64, FixedU128,
-    types::{
-        U32F32,
-        extra::{U12, U14, U16, U20, U24, U32, U64},
-    },
-};
+use fixed::{FixedI128, types::extra::U16};
 
 pub mod error;
 pub mod graph;

@@ -27,7 +27,6 @@ const MIN_NODE_HEIGHT: i32 = 100;
 const IO_CIRCLE_RADIUS: i32 = 16;
 const IO_IMAGE_SIZE: i32 = (IO_CIRCLE_RADIUS * 3) / 2;
 const POSITION_INCREMENT: f64 = 25.0;
-const TEXT_HEIGHT: i32 = 10;
 
 fn get_recipe(rid: RecipeId) -> Arc<Recipe> {
     let recipes = expect_context::<Recipes>();
@@ -462,8 +461,6 @@ fn render_node_inner(data: NodeData) -> impl IntoView {
     let image_x = (NODE_WIDTH - NODE_IMAGE_SIZE) / 2;
     let amount = format_amount(data.amount());
     let label = data.label().to_string();
-    let text_y = image_y + NODE_IMAGE_SIZE;
-    let text_x = image_x;
 
     view! {
         <g class="graph-node-inner">
@@ -520,8 +517,6 @@ fn render_io(
     let x = if input { 0 } else { NODE_WIDTH };
     let transform = format!("translate({}, {})", x, y);
     let amount = format_amount(amount);
-    let text_x = -IO_CIRCLE_RADIUS;
-    let text_y = (IO_CIRCLE_RADIUS * 3) / 4;
     let item_name = item.name.to_string();
 
     view! {
