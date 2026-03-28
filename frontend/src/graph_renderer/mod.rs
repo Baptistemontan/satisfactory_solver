@@ -13,8 +13,8 @@ use leptos::{
     ev::{MouseEvent, WheelEvent},
     prelude::*,
 };
-use solver::graph;
 use solver::recipe::{BuildingId, ItemId, RecipeId};
+use solver::{Fl, graph};
 use web_sys::wasm_bindgen::JsCast;
 
 pub mod component;
@@ -69,46 +69,48 @@ impl NodeData {
         }
     }
 
-    pub fn inputs(self) -> Arc<[(ItemId, f64)]> {
+    pub fn inputs(self) -> Arc<[(ItemId, Fl)]> {
         match self.0 {
             graph::Node::Recipe { rid, amount } => {
                 let recipe = get_recipe(rid);
-                let coef = (60.0 / recipe.time()) * amount.to_num::<f64>();
+                let time_coef = Fl::from_num(60) / Fl::from_num(recipe.time());
+                let coef = time_coef * amount;
                 recipe
                     .inputs()
                     .iter()
-                    .map(|(iid, qty)| (*iid, coef * *qty))
+                    .map(|(iid, qty)| (*iid, coef * Fl::from_num(*qty)))
                     .collect()
             }
             graph::Node::Output { iid, amount } | graph::Node::Excess { iid, amount } => {
-                Arc::from([(iid, amount.to_num())])
+                Arc::from([(iid, amount)])
             }
             graph::Node::Input { .. } => Arc::default(),
         }
     }
 
-    pub fn outputs(self) -> Arc<[(ItemId, f64)]> {
+    pub fn outputs(self) -> Arc<[(ItemId, Fl)]> {
         match self.0 {
             graph::Node::Recipe { rid, amount } => {
                 let recipe = get_recipe(rid);
-                let coef = (60.0 / recipe.time()) * amount.to_num::<f64>();
+                let time_coef = Fl::from_num(60) / Fl::from_num(recipe.time());
+                let coef = time_coef * amount;
                 recipe
                     .outputs()
                     .iter()
-                    .map(|(iid, qty)| (*iid, coef * *qty))
+                    .map(|(iid, qty)| (*iid, coef * Fl::from_num(*qty)))
                     .collect()
             }
-            graph::Node::Input { iid, amount } => Arc::from([(iid, amount.to_num())]),
+            graph::Node::Input { iid, amount } => Arc::from([(iid, amount)]),
             graph::Node::Output { .. } | graph::Node::Excess { .. } => Arc::default(),
         }
     }
 
-    pub fn amount(self) -> f64 {
+    pub fn amount(self) -> Fl {
         match self.0 {
-            graph::Node::Recipe { amount, .. } => amount.to_num(),
-            graph::Node::Input { amount, .. } => amount.to_num(),
-            graph::Node::Output { amount, .. } => amount.to_num(),
-            graph::Node::Excess { amount, .. } => amount.to_num(),
+            graph::Node::Recipe { amount, .. } => amount,
+            graph::Node::Input { amount, .. } => amount,
+            graph::Node::Output { amount, .. } => amount,
+            graph::Node::Excess { amount, .. } => amount,
         }
     }
 
@@ -291,9 +293,9 @@ pub fn Graph(graph: SerializableGraph) -> impl IntoView {
     };
 
     let on_mousedown = move |e: MouseEvent| {
-        if e.button() != 1 {
-            return;
-        }
+        // if e.button() != 1 {
+        //     return;
+        // }
         e.prevent_default(); // prevents autoscroll mode that browsers trigger on middle click
         dragging.set(true);
         drag_start_x.set(e.client_x() as f64 - tx.get());
@@ -317,8 +319,9 @@ pub fn Graph(graph: SerializableGraph) -> impl IntoView {
 
     let on_mouseup = move |e: MouseEvent| {
         if e.button() == 1 {
-            dragging.set(false)
+            dragging.set(false);
         } else if e.button() == 0 {
+            dragging.set(false);
             node_drag.dragging.set(false);
         }
     };
@@ -471,7 +474,10 @@ fn compute_io_y_offset(idx: usize, io_count: usize, size: i32) -> i32 {
     increment * (1 + idx as i32)
 }
 
-fn format_amount(amount: f64) -> String {
+fn format_amount(amount: Fl) -> String {
+    let integ = amount.round();
+    let diff = amount - integ;
+    let amount = if diff.abs() < 0.02 { integ } else { amount };
     let amount = format!("{:.3}", amount);
     let trimmed = amount.trim_end_matches('0').trim_end_matches('.');
     if trimmed.is_empty() {
@@ -483,7 +489,7 @@ fn format_amount(amount: f64) -> String {
 
 fn render_io(
     iid: ItemId,
-    amount: f64,
+    amount: Fl,
     idx: usize,
     io_count: usize,
     size: i32,
