@@ -74,26 +74,15 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
         .items
         .keys()
         .filter_map(|iid| {
-            let item = items.items.get(iid)?;
-            let amount_state = match item.ressource {
-                Some(qty) => AmountState::Some(qty),
-                None => AmountState::None,
-            };
-            Some((*iid, RwSignal::new(amount_state)))
+            items
+                .items
+                .get(iid)
+                .and_then(|item| item.ressource)
+                .map(|qty| (*iid, AmountState::Some(qty)))
         })
-        .collect::<BTreeMap<_, _>>();
+        .collect::<Vec<_>>();
 
-    let mut targets = items
-        .items
-        .keys()
-        .filter_map(|iid| {
-            let item = items.items.get(iid)?;
-            if item.ressource.is_some() {
-                return None;
-            }
-            Some((*iid, RwSignal::new(AmountState::None)))
-        })
-        .collect::<BTreeMap<_, _>>();
+    let mut targets = Vec::new();
 
     /* setup */
 
@@ -102,7 +91,7 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
 
     // leptos::logging::log!("{:#?}", items);
 
-    targets.insert(plastic_item_id, RwSignal::new(AmountState::Maximize(0.0)));
+    targets.push((plastic_item_id, AmountState::Maximize(0.0)));
 
     // let crude_oil_id = ItemId(149);
     // let water_id = ItemId(139);
@@ -112,8 +101,8 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
 
     /* end setup */
 
-    let available_items = Arc::new(available_items);
-    let targets = Arc::new(targets);
+    let available_items = RwSignal::new(available_items);
+    let targets = RwSignal::new(targets);
     let selected_recipes = recipes
         .recipes
         .keys()
@@ -123,8 +112,6 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
     move || {
         let tab = selected_tab.get();
         let selected_recipes = selected_recipes.clone();
-        let available_items = available_items.clone();
-        let targets = targets.clone();
         match tab.as_str() {
             PRODUCTION => EitherOf4::A(view! {
                 <ContentInner>
@@ -138,12 +125,12 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
             }),
             INPUTS => EitherOf4::C(view! {
                 <ContentInner>
-                    <InputTab available_items=available_items />
+                    <InputTab available_items_signal=available_items />
                 </ContentInner>
             }),
             OUTPUTS => EitherOf4::D(view! {
                 <ContentInner>
-                    <OutputsTab targets=targets />
+                    <OutputsTab targets_signal=targets />
                 </ContentInner>
             }),
             _ => unreachable!(),

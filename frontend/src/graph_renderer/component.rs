@@ -16,8 +16,8 @@ use crate::{graph_renderer::SerializableGraph, item::AmountState, recipes::Recip
 #[component]
 pub fn GraphVisualizer(
     selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>,
-    available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>,
-    targets: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>,
+    available_items: RwSignal<Vec<(ItemId, AmountState)>>,
+    targets: RwSignal<Vec<(ItemId, AmountState)>>,
 ) -> impl IntoView {
     let recipes = expect_context::<Recipes>();
 
@@ -29,24 +29,31 @@ pub fn GraphVisualizer(
                 solver_recipes.insert(*rid, r.inner.clone());
             }
         }
-        let mut availables = BTreeMap::new();
-        for (iid, qty) in &*available_items {
-            if let AmountState::Some(qty) = qty.get() {
-                availables.insert(*iid, qty);
+        let availables = available_items.with(|available_items| {
+            let mut availables = BTreeMap::new();
+            for (iid, qty) in available_items {
+                if let AmountState::Some(qty) = *qty {
+                    availables.insert(*iid, qty);
+                }
             }
-        }
-        let mut solve_for = Vec::new();
-        for (iid, qty) in &*targets {
-            let target_qty = match qty.get() {
-                AmountState::Maximize(_) => None,
-                AmountState::Some(qty) => Some(qty),
-                _ => continue,
-            };
-            solve_for.push(Target {
-                iid: *iid,
-                qty: target_qty,
-            });
-        }
+            availables
+        });
+
+        let solve_for = targets.with(|targets| {
+            let mut solve_for = Vec::new();
+            for (iid, qty) in targets {
+                let target_qty = match *qty {
+                    AmountState::Maximize(_) => None,
+                    AmountState::Some(qty) => Some(qty),
+                    _ => continue,
+                };
+                solve_for.push(Target {
+                    iid: *iid,
+                    qty: target_qty,
+                });
+            }
+            solve_for
+        });
 
         let water_iid = ItemId(139);
 

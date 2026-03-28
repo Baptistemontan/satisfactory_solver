@@ -40,8 +40,25 @@ pub struct Items {
 pub struct RessourcesResetProvider(ReadSignal<Option<bool>>);
 
 #[component]
-pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -> impl IntoView {
+pub fn InputTab(available_items_signal: RwSignal<Vec<(ItemId, AmountState)>>) -> impl IntoView {
     let items = expect_context::<Items>();
+    let available_items = available_items_signal.read_untracked();
+    let available_items = available_items
+        .iter()
+        .map(|(iid, qty)| (*iid, *qty))
+        .collect::<BTreeMap<_, _>>();
+    let amount_signals = items
+        .items
+        .keys()
+        .map(|iid| {
+            let amount = available_items
+                .get(iid)
+                .copied()
+                .unwrap_or(AmountState::None);
+            (*iid, RwSignal::new(amount))
+        })
+        .collect::<BTreeMap<_, _>>();
+
     let mut selected_items = BTreeMap::new();
     {
         for (iid, item) in items.items.iter() {
@@ -50,21 +67,22 @@ pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -
             }
             let is_selected = available_items
                 .get(iid)
-                .is_some_and(|v| !matches!(v.get_untracked(), AmountState::None));
+                .is_some_and(|qty| !matches!(qty, AmountState::None));
             // selected_items.insert(*iid, RwSignal::new(is_selected));
             selected_items.insert(*iid, RwSignal::new(is_selected));
         }
     }
+    let amount_signals = Arc::new(amount_signals);
     let selected_items = Arc::new(selected_items);
 
     let ressources = Memo::new({
-        let available_items = available_items.clone();
         let items = items.clone();
+        let amount_signals = amount_signals.clone();
         move |_| {
             let mut ressources = Vec::new();
             for (iid, item) in items.items.iter() {
                 if item.ressource.is_some() {
-                    let amount = available_items.get(iid).unwrap();
+                    let amount = amount_signals.get(iid).unwrap();
                     ressources.push((*iid, *amount));
                 }
             }
@@ -74,18 +92,36 @@ pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -
 
     let item_selection = Memo::new({
         let selected_items = selected_items.clone();
-        move |_| {
-            let mut items = Vec::new();
+        move |old| {
+            let mut items: Vec<(ItemId, RwSignal<AmountState>)> = old.cloned().unwrap_or_default();
+            let already_selected = items.iter().map(|a| a.0).collect::<BTreeSet<_>>();
             for (iid, selected) in &*selected_items {
-                let amount = available_items.get(iid).unwrap();
-                if selected.get() {
-                    items.push((*iid, *amount));
-                } else {
-                    amount.set(AmountState::None);
+                let is_already_selected = already_selected.contains(iid);
+                let amount = amount_signals.get(iid).unwrap();
+                match (selected.get(), is_already_selected) {
+                    (true, true) | (false, false) => {
+                        // do nothing
+                    }
+                    (true, false) => {
+                        items.push((*iid, *amount));
+                    }
+                    (false, true) => {
+                        let pos = items.iter().position(|a| a.0 == *iid).unwrap_or(0);
+                        items.remove(pos);
+                    }
                 }
             }
             items
         }
+    });
+
+    Effect::new(move |_| {
+        let selected_items = item_selection.read();
+        let new_targets = selected_items
+            .iter()
+            .map(|(iid, v)| (*iid, v.get()))
+            .collect();
+        available_items_signal.set(new_targets);
     });
 
     let reset_signal = RwSignal::new(None);
@@ -147,8 +183,21 @@ pub fn InputTab(available_items: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -
 }
 
 #[component]
-pub fn OutputsTab(targets: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -> impl IntoView {
+pub fn OutputsTab(targets_signal: RwSignal<Vec<(ItemId, AmountState)>>) -> impl IntoView {
     let items = expect_context::<Items>();
+    let targets = targets_signal.read_untracked();
+    let targets = targets
+        .iter()
+        .map(|(iid, qty)| (*iid, *qty))
+        .collect::<BTreeMap<_, _>>();
+    let amount_signals = items
+        .items
+        .keys()
+        .map(|iid| {
+            let amount = targets.get(iid).copied().unwrap_or(AmountState::None);
+            (*iid, RwSignal::new(amount))
+        })
+        .collect::<BTreeMap<_, _>>();
     let mut selected_items = BTreeMap::new();
     {
         for (iid, item) in items.items.iter() {
@@ -157,27 +206,46 @@ pub fn OutputsTab(targets: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>) -> impl
             }
             let is_selected = targets
                 .get(iid)
-                .is_some_and(|v| !matches!(v.get_untracked(), AmountState::None));
+                .is_some_and(|qty| !matches!(qty, AmountState::None));
             // selected_items.insert(*iid, RwSignal::new(is_selected));
             selected_items.insert(*iid, RwSignal::new(is_selected));
         }
     }
+    let amount_signals = Arc::new(amount_signals);
     let selected_items = Arc::new(selected_items);
 
     let item_selection = Memo::new({
         let selected_items = selected_items.clone();
-        move |_| {
-            let mut items = Vec::new();
+        move |old| {
+            let mut items: Vec<(ItemId, RwSignal<AmountState>)> = old.cloned().unwrap_or_default();
+            let already_selected = items.iter().map(|a| a.0).collect::<BTreeSet<_>>();
             for (iid, selected) in &*selected_items {
-                let amount = targets.get(iid).unwrap();
-                if selected.get() {
-                    items.push((*iid, *amount));
-                } else {
-                    amount.set(AmountState::None);
+                let is_already_selected = already_selected.contains(iid);
+                let amount = amount_signals.get(iid).unwrap();
+                match (selected.get(), is_already_selected) {
+                    (true, true) | (false, false) => {
+                        // do nothing
+                    }
+                    (true, false) => {
+                        items.push((*iid, *amount));
+                    }
+                    (false, true) => {
+                        let pos = items.iter().position(|a| a.0 == *iid).unwrap_or(0);
+                        items.remove(pos);
+                    }
                 }
             }
             items
         }
+    });
+
+    Effect::new(move |_| {
+        let selected_items = item_selection.read();
+        let new_targets = selected_items
+            .iter()
+            .map(|(iid, v)| (*iid, v.get()))
+            .collect();
+        targets_signal.set(new_targets);
     });
 
     view! {
