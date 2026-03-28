@@ -18,6 +18,7 @@ pub fn GraphVisualizer(
     selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>,
     available_items: RwSignal<Vec<(ItemId, AmountState)>>,
     targets: RwSignal<Vec<(ItemId, AmountState)>>,
+    item_cost: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>,
 ) -> impl IntoView {
     let recipes = expect_context::<Recipes>();
 
@@ -55,9 +56,20 @@ pub fn GraphVisualizer(
             solve_for
         });
 
-        let water_iid = ItemId(139);
-
-        let item_cost = BTreeMap::from([(water_iid, 0.0)]);
+        let item_cost = item_cost
+            .iter()
+            .map(|(iid, cost)| {
+                let cost = match cost.get() {
+                    AmountState::Some(qty)
+                    | AmountState::Disabled(qty)
+                    | AmountState::Maximize(qty)
+                    | AmountState::MaximizeDisabled(qty) => qty,
+                    AmountState::EnabledZero | AmountState::DisabledZero => 0.0,
+                    AmountState::None => 1.0,
+                };
+                (*iid, cost)
+            })
+            .collect();
 
         leptos::logging::log!("{:?}", solve_for);
 

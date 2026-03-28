@@ -12,6 +12,7 @@ use thaw::{BackTop, Button, Checkbox, Divider, Input, Scrollbar, SpinButton, Swi
 #[derive(Debug)]
 pub struct Item {
     pub id: ItemId,
+    pub slug: Arc<str>,
     pub icon: Arc<str>,
     pub name: Arc<str>,
     pub ressource: Option<f64>,
@@ -34,13 +35,17 @@ pub enum AmountState {
 #[derive(Debug, Clone)]
 pub struct Items {
     pub items: Arc<BTreeMap<ItemId, Arc<Item>>>,
+    pub slug_search: Arc<BTreeMap<Arc<str>, ItemId>>,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct RessourcesResetProvider(ReadSignal<Option<bool>>);
 
 #[component]
-pub fn InputTab(available_items_signal: RwSignal<Vec<(ItemId, AmountState)>>) -> impl IntoView {
+pub fn InputTab(
+    available_items_signal: RwSignal<Vec<(ItemId, AmountState)>>,
+    item_costs: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>,
+) -> impl IntoView {
     let items = expect_context::<Items>();
     let available_items = available_items_signal.read_untracked();
     let available_items = available_items
@@ -90,6 +95,21 @@ pub fn InputTab(available_items_signal: RwSignal<Vec<(ItemId, AmountState)>>) ->
         }
     });
 
+    let ressources_costs = Memo::new({
+        let items = items.clone();
+        let item_costs = item_costs.clone();
+        move |_| {
+            let mut ressources = Vec::new();
+            for (iid, item) in items.items.iter() {
+                if item.ressource.is_some() {
+                    let amount = item_costs.get(iid).unwrap();
+                    ressources.push((*iid, *amount));
+                }
+            }
+            ressources
+        }
+    });
+
     let item_selection = Memo::new({
         let selected_items = selected_items.clone();
         move |old| {
@@ -115,6 +135,18 @@ pub fn InputTab(available_items_signal: RwSignal<Vec<(ItemId, AmountState)>>) ->
         }
     });
 
+    let item_cost_selection = Memo::new(move |_| {
+        item_selection.with(|selected| {
+            selected
+                .iter()
+                .map(|(iid, _)| {
+                    let cost_signal = item_costs.get(iid).unwrap();
+                    (*iid, *cost_signal)
+                })
+                .collect::<Vec<_>>()
+        })
+    });
+
     Effect::new(move |_| {
         let selected_items = item_selection.read();
         let ressources = ressources.read();
@@ -137,6 +169,7 @@ pub fn InputTab(available_items_signal: RwSignal<Vec<(ItemId, AmountState)>>) ->
     };
 
     let input_selection = RwSignal::new(false);
+    let item_cost_input = RwSignal::new(false);
 
     provide_context(RessourcesResetProvider(reset_signal.read_only()));
 
@@ -145,7 +178,10 @@ pub fn InputTab(available_items_signal: RwSignal<Vec<(ItemId, AmountState)>>) ->
             {
                 let selected_items = selected_items.clone();
                 move || {
-                    if input_selection.get() {
+                    let input_selection = input_selection.get();
+                    let cost_input = item_cost_input.get();
+                    let ressources = if cost_input { ressources_costs } else { ressources };
+                    if input_selection {
                         Either::Left(view! {
                             <ItemList selected_items={selected_items.clone()}/>
                         })
@@ -155,8 +191,8 @@ pub fn InputTab(available_items_signal: RwSignal<Vec<(ItemId, AmountState)>>) ->
                                 <div class="input-ressources-selection-header">
                                     <span>"Ressources"</span>
                                     <div class="input-ressources-selection-toggles">
-                                        <Button on_click=set_ressources_to_zero>"Set to 0"</Button>
-                                        <Button on_click=set_ressources_to_max>"Set to max"</Button>
+                                        <Button on_click=set_ressources_to_zero disabled=cost_input>"Set to 0"</Button>
+                                        <Button on_click=set_ressources_to_max disabled=cost_input>"Set to max"</Button>
                                     </div>
                                 </div>
                                 <Divider />
@@ -174,11 +210,20 @@ pub fn InputTab(available_items_signal: RwSignal<Vec<(ItemId, AmountState)>>) ->
                     <span>"Inputs"</span>
                     <div class="input-ressources-selection-toggles">
                         // <ItemSelector selected_items={selected_items.clone()} />
+                        <Switch checked=item_cost_input label="Edit Costs"  />
                         <Switch checked=input_selection label="Edit Inputs"  />
                     </div>
                 </div>
                 <Divider />
-                <ItemsAmountInput item_selection=item_selection selected=selected_items />
+                {
+                    move || {
+                        let selected_items = selected_items.clone();
+                        let item_selection = if item_cost_input.get() { item_cost_selection } else { item_selection };
+                        view! {
+                            <ItemsAmountInput item_selection=item_selection selected=selected_items />
+                        }
+                    }
+                }
             </div>
         </div>
     }
@@ -379,7 +424,7 @@ fn DisplayItem(item_id: ItemId, selected: RwSignal<bool>) -> impl IntoView {
 
 #[component]
 pub fn ItemsAmountInput(
-    item_selection: Memo<Vec<(ItemId, RwSignal<AmountState>)>>,
+    #[prop(into)] item_selection: Signal<Vec<(ItemId, RwSignal<AmountState>)>>,
     #[prop(optional)] selected: Option<Arc<BTreeMap<ItemId, RwSignal<bool>>>>,
     #[prop(default = false)] maximize: bool,
 ) -> impl IntoView {

@@ -1,13 +1,11 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::DATA;
 use crate::item::{AmountState, InputTab, Items, OutputsTab};
 use crate::recipes::RecipeTab;
 use crate::{graph_renderer::component::GraphVisualizer, recipes::Recipes};
 use leptos::either::EitherOf4;
 use leptos::prelude::*;
-use solver::recipe::ItemId;
 use thaw::{Button, Tab, TabList, Theme};
 
 const PRODUCTION: &str = "production";
@@ -84,10 +82,19 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
 
     let mut targets = Vec::new();
 
-    /* setup */
+    let mut item_costs = items
+        .items
+        .keys()
+        .map(|iid| (*iid, RwSignal::new(AmountState::Some(1.0))))
+        .collect::<BTreeMap<_, _>>();
 
-    let plastic_item_id = ItemId(59);
-    let turbo_motor_iid = ItemId(38);
+    // set water to no cost by default
+    let water_iid = items.slug_search.get("water").copied().unwrap();
+    item_costs.insert(water_iid, RwSignal::new(AmountState::Some(0.0)));
+
+    /* debug setup */
+
+    let plastic_item_id = items.slug_search.get("plastic").copied().unwrap();
 
     // leptos::logging::log!("{:#?}", items);
 
@@ -109,13 +116,20 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
         .map(|rid| (*rid, RwSignal::new(true)))
         .collect::<BTreeMap<_, _>>();
     let selected_recipes = Arc::new(selected_recipes);
+    let item_costs = Arc::new(item_costs);
     move || {
         let tab = selected_tab.get();
         let selected_recipes = selected_recipes.clone();
+        let item_costs = item_costs.clone();
         match tab.as_str() {
             PRODUCTION => EitherOf4::A(view! {
                 <ContentInner>
-                    <GraphVisualizer selected_recipes=selected_recipes available_items=available_items targets=targets />
+                    <GraphVisualizer
+                        selected_recipes=selected_recipes
+                        available_items=available_items
+                        targets=targets
+                        item_cost=item_costs
+                    />
                 </ContentInner>
             }),
             RECIPES => EitherOf4::B(view! {
@@ -125,7 +139,7 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
             }),
             INPUTS => EitherOf4::C(view! {
                 <ContentInner>
-                    <InputTab available_items_signal=available_items />
+                    <InputTab available_items_signal=available_items item_costs=item_costs />
                 </ContentInner>
             }),
             OUTPUTS => EitherOf4::D(view! {

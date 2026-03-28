@@ -31,14 +31,21 @@ where
         recipes.insert(recipe.id);
     }
 
+    let slug_search = main_seed
+        .items
+        .iter()
+        .map(|(iid, item)| (item.slug.clone(), *iid))
+        .collect::<BTreeMap<_, _>>();
+
     let recipes = Arc::new(main_seed.recipes);
     let items = Arc::new(main_seed.items);
     let buildings = Arc::new(main_seed.buildings);
     let building_recipes = Arc::new(building_recipes);
+    let slug_search = Arc::new(slug_search);
 
     Ok((
         Recipes { recipes },
-        Items { items },
+        Items { items, slug_search },
         Buildings {
             buildings,
             recipes: building_recipes,
@@ -213,6 +220,7 @@ impl<'de> Visitor<'de> for ItemSeed<'_> {
         let mut liquid = None;
         let mut name = None;
         let mut icon = None;
+        let mut slug = None;
         while let Some(field) = map.next_key::<ItemField>()? {
             match field {
                 ItemField::Description => deserialize_and_set(&mut description, &mut map)?,
@@ -220,6 +228,7 @@ impl<'de> Visitor<'de> for ItemSeed<'_> {
                 ItemField::Liquid => deserialize_and_set(&mut liquid, &mut map)?,
                 ItemField::Name => deserialize_and_set(&mut name, &mut map)?,
                 ItemField::Icon => deserialize_and_set(&mut icon, &mut map)?,
+                ItemField::Slug => deserialize_and_set(&mut slug, &mut map)?,
                 _ => {
                     // TODO
                     map.next_value::<IgnoredAny>()?;
@@ -237,6 +246,7 @@ impl<'de> Visitor<'de> for ItemSeed<'_> {
         // TODO: don't unwrap here
         Ok(Item {
             id: self.iid,
+            slug: slug.unwrap(),
             icon: icon.unwrap(),
             name: name.unwrap(),
             ressource,
