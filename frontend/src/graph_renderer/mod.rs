@@ -15,6 +15,7 @@ use leptos::{
 };
 use solver::recipe::{BuildingId, ItemId, RecipeId};
 use solver::{Fl, graph};
+use thaw::Tooltip;
 use web_sys::wasm_bindgen::JsCast;
 
 pub mod component;
@@ -130,6 +131,21 @@ impl NodeData {
         };
 
         format_icon_href(&icon)
+    }
+
+    pub fn label(self) -> Arc<str> {
+        match self.0 {
+            graph::Node::Recipe { rid, .. } => {
+                let recipe = get_recipe(rid);
+                recipe.name.clone()
+            }
+            graph::Node::Excess { iid, .. }
+            | graph::Node::Input { iid, .. }
+            | graph::Node::Output { iid, .. } => {
+                let item = get_item(iid);
+                item.name.clone()
+            }
+        }
     }
 }
 
@@ -445,6 +461,7 @@ fn render_node_inner(data: NodeData) -> impl IntoView {
     let image_y = (height - NODE_IMAGE_SIZE) / 2;
     let image_x = (NODE_WIDTH - NODE_IMAGE_SIZE) / 2;
     let amount = format_amount(data.amount());
+    let label = data.label().to_string();
     let text_y = image_y + NODE_IMAGE_SIZE;
     let text_x = image_x;
 
@@ -456,9 +473,11 @@ fn render_node_inner(data: NodeData) -> impl IntoView {
                 height=height
                 width=NODE_WIDTH
             />
-            <image href=icon_href width=NODE_IMAGE_SIZE height=NODE_IMAGE_SIZE x=image_x y=image_y />
-            <foreignObject x=text_x y=text_y height=TEXT_HEIGHT width=NODE_IMAGE_SIZE>
+            <foreignObject x=image_x y=image_y height=NODE_IMAGE_SIZE width=NODE_IMAGE_SIZE>
                 <div class="amount recipe-amount">
+                    <Tooltip content=label>
+                        <img src=icon_href width=NODE_IMAGE_SIZE height=NODE_IMAGE_SIZE draggable="false" />
+                    </Tooltip>
                     <div>{amount}</div>
                 </div>
             </foreignObject>
@@ -503,14 +522,18 @@ fn render_io(
     let amount = format_amount(amount);
     let text_x = -IO_CIRCLE_RADIUS;
     let text_y = (IO_CIRCLE_RADIUS * 3) / 4;
+    let item_name = item.name.to_string();
 
     view! {
         <g transform=transform class="node-io">
             <circle r=IO_CIRCLE_RADIUS/>
-            <image href=icon_href width=IO_IMAGE_SIZE height=IO_IMAGE_SIZE y={IO_IMAGE_SIZE / -2} x={IO_IMAGE_SIZE / -2} />
-            <foreignObject x=text_x y=text_y width={IO_CIRCLE_RADIUS * 2} height=TEXT_HEIGHT>
+            <foreignObject x={IO_IMAGE_SIZE / -2} y={IO_IMAGE_SIZE / -2} width=IO_IMAGE_SIZE height=IO_IMAGE_SIZE>
                 <div class="amount io-amount">
+                    <Tooltip content=item_name>
+                        <img src=icon_href width=IO_IMAGE_SIZE height=IO_IMAGE_SIZE draggable="false" />
+                    </Tooltip>
                     <div>{amount}</div>
+
                 </div>
             </foreignObject>
         </g>

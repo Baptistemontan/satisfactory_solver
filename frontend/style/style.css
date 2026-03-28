@@ -39,11 +39,21 @@ foreignObject {
     text-shadow: 0 0 2px black, 0 0 2px black, 0 0 3px black, 0 0 3px black, 0 0 4px black, 0 0 4px black, 0 0 6px black;
 }
 
-.io-amount > div {
-    text-align: center;
+.io-amount, .recipe-amount {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
 }
 
+/* .io-amount > div {
+    height: 100%;
+    text-align: center;
+} */
+
 .recipe-amount > div {
+    width: 100%;
     text-align: right;
 }
 

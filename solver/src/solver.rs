@@ -86,9 +86,15 @@ fn fast_solve_minimize<S: LPSolver + Clone>(
     recipes: &mut BTreeMap<RecipeId, Arc<Recipe>>,
     output_constraints: &BTreeMap<ItemId, f64>,
     mut availables: BTreeMap<ItemId, f64>,
+    item_cost: &BTreeMap<ItemId, f64>,
 ) -> SolutionResult<S> {
-    let locked_outputs =
-        find_used_recipes(solver.clone(), recipes, output_constraints, &mut availables)?;
+    let locked_outputs = find_used_recipes(
+        solver.clone(),
+        recipes,
+        output_constraints,
+        &mut availables,
+        item_cost,
+    )?;
 
     let mut vars = variables!();
     let mut recipes_var = BTreeMap::<RecipeId, Variable>::new();
@@ -129,7 +135,12 @@ fn fast_solve_minimize<S: LPSolver + Clone>(
 
     let mut minimize_expr = Expression::from(0.0);
 
-    for var in inputs_var.values().chain(recipes_var.values()) {
+    for (iid, var) in &inputs_var {
+        let cost = item_cost.get(iid).copied().unwrap_or(1.0).max(0.001);
+        minimize_expr -= cost * *var;
+    }
+
+    for var in recipes_var.values() {
         minimize_expr -= *var;
     }
 
@@ -154,6 +165,7 @@ fn find_used_recipes<S: LPSolver>(
     recipes: &mut BTreeMap<RecipeId, Arc<Recipe>>,
     output_constraints: &BTreeMap<ItemId, f64>,
     availables: &mut BTreeMap<ItemId, f64>,
+    item_cost: &BTreeMap<ItemId, f64>,
 ) -> Result<BTreeSet<ItemId>, S> {
     let mut vars = variables!();
     let mut recipes_var = BTreeMap::<RecipeId, Variable>::new();
@@ -191,7 +203,12 @@ fn find_used_recipes<S: LPSolver>(
 
     let mut minimize_expr = Expression::from(0.0);
 
-    for var in inputs_var.values().chain(recipes_var.values()) {
+    for (iid, var) in &inputs_var {
+        let cost = item_cost.get(iid).copied().unwrap_or(1.0);
+        minimize_expr -= cost * *var;
+    }
+
+    for var in recipes_var.values() {
         minimize_expr -= *var;
     }
 
@@ -353,6 +370,7 @@ pub fn optimize<S: LPSolver + Clone>(
     targets: &[Target],
     recipes: &mut BTreeMap<RecipeId, Arc<Recipe>>,
     availables: BTreeMap<ItemId, f64>,
+    item_cost: &BTreeMap<ItemId, f64>,
 ) -> SolutionResult<S> {
     if targets.is_empty() {
         return Err(Error::NoTarget);
@@ -377,5 +395,5 @@ pub fn optimize<S: LPSolver + Clone>(
         *set_target += maximized;
     }
 
-    fast_solve_minimize(solver, recipes, &set_targets, availables)
+    fast_solve_minimize(solver, recipes, &set_targets, availables, item_cost)
 }

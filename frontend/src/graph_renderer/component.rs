@@ -48,9 +48,19 @@ pub fn GraphVisualizer(
             });
         }
 
+        let water_iid = ItemId(139);
+
+        let item_cost = BTreeMap::from([(water_iid, 0.0)]);
+
         leptos::logging::log!("{:?}", solve_for);
 
-        let solution = optimize(SOLVER, &solve_for, &mut solver_recipes, availables);
+        let solution = optimize(
+            SOLVER,
+            &solve_for,
+            &mut solver_recipes,
+            availables,
+            &item_cost,
+        );
 
         let solution = match solution {
             Ok(sol) => sol,
