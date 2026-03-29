@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::i18n::*;
-use crate::item::{AmountState, InputTab, Items, OutputsTab};
+use crate::item::{InputTab, Items, OutputsTab};
 use crate::recipes::RecipeTab;
 use crate::{graph_renderer::component::GraphVisualizer, recipes::Recipes};
 use leptos::either::EitherOf4;
@@ -70,37 +70,68 @@ pub fn Header(selected_tab: RwSignal<String>, theme: RwSignal<Theme>) -> impl In
 pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
     let items = expect_context::<Items>();
     let recipes = expect_context::<Recipes>();
-    let available_items = items
-        .items
-        .keys()
-        .filter_map(|iid| {
-            items
-                .items
-                .get(iid)
-                .and_then(|item| item.ressource)
-                .map(|qty| (*iid, AmountState::Some(qty)))
-        })
-        .collect::<Vec<_>>();
 
-    let mut targets = Vec::new();
-
-    let mut item_costs = items
-        .items
+    let selected_recipes = recipes
+        .recipes
         .keys()
-        .map(|iid| (*iid, RwSignal::new(AmountState::Some(1.0))))
+        .map(|rid| (*rid, RwSignal::new(true)))
         .collect::<BTreeMap<_, _>>();
+
+    let amount_signals = items
+        .items
+        .iter()
+        .map(|(iid, item)| {
+            let amount = item.ressource.unwrap_or(0.0);
+            (*iid, RwSignal::new(amount))
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    let mut cost_signals = items
+        .items
+        .keys()
+        .map(|iid| (*iid, RwSignal::new(1.0)))
+        .collect::<BTreeMap<_, _>>();
+
+    let mut targets_amount_signals = items
+        .items
+        .keys()
+        .map(|iid| (*iid, RwSignal::new(0.0)))
+        .collect::<BTreeMap<_, _>>();
+
+    let input_enabled = items
+        .items
+        .iter()
+        .map(|(iid, item)| (*iid, RwSignal::new(item.ressource.is_some())))
+        .collect::<BTreeMap<_, _>>();
+
+    let mut output_enabled = items
+        .items
+        .iter()
+        .map(|(iid, item)| (*iid, RwSignal::new(item.ressource.is_some())))
+        .collect::<BTreeMap<_, _>>();
+
+    let mut output_maximized = items
+        .items
+        .keys()
+        .map(|iid| (*iid, RwSignal::new(false)))
+        .collect::<BTreeMap<_, _>>();
+
+    let available_items = Vec::new();
+    let mut targets = Vec::new();
 
     // set water to no cost by default
     let water_iid = items.slug_search.get("water").copied().unwrap();
-    item_costs.insert(water_iid, RwSignal::new(AmountState::Some(0.0)));
+    cost_signals.insert(water_iid, RwSignal::new(0.0));
 
     /* debug setup */
 
     let plastic_item_id = items.slug_search.get("plastic").copied().unwrap();
+    targets_amount_signals.insert(plastic_item_id, RwSignal::new(0.0));
+    output_enabled.insert(plastic_item_id, RwSignal::new(true));
+    output_maximized.insert(plastic_item_id, RwSignal::new(true));
+    targets.push(plastic_item_id);
 
     // leptos::logging::log!("{:#?}", items);
-
-    targets.push((plastic_item_id, AmountState::Maximize(0.0)));
 
     // let crude_oil_id = ItemId(149);
     // let water_id = ItemId(139);
@@ -112,25 +143,35 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
 
     let available_items = RwSignal::new(available_items);
     let targets = RwSignal::new(targets);
-    let selected_recipes = recipes
-        .recipes
-        .keys()
-        .map(|rid| (*rid, RwSignal::new(true)))
-        .collect::<BTreeMap<_, _>>();
+
     let selected_recipes = Arc::new(selected_recipes);
-    let item_costs = Arc::new(item_costs);
+    let amount_signals = Arc::new(amount_signals);
+    let cost_signals = Arc::new(cost_signals);
+    let targets_amount_signals = Arc::new(targets_amount_signals);
+    let output_maximized = Arc::new(output_maximized);
+    let output_enabled = Arc::new(output_enabled);
+    let input_enabled = Arc::new(input_enabled);
     move || {
         let tab = selected_tab.get();
         let selected_recipes = selected_recipes.clone();
-        let item_costs = item_costs.clone();
+        let amount_signals = amount_signals.clone();
+        let cost_signals = cost_signals.clone();
+        let targets_amount_signals = targets_amount_signals.clone();
+        let output_maximized = output_maximized.clone();
+        let output_enabled = output_enabled.clone();
+        let input_enabled = input_enabled.clone();
         match tab.as_str() {
             PRODUCTION => EitherOf4::A(view! {
                 <ContentInner>
                     <GraphVisualizer
                         selected_recipes=selected_recipes
-                        available_items=available_items
                         targets=targets
-                        item_cost=item_costs
+                        availables_amount_signals=amount_signals
+                        cost_signals=cost_signals
+                        target_signals=targets_amount_signals
+                        output_maximized=output_maximized
+                        output_enabled=output_enabled
+                        input_enabled=input_enabled
                     />
                 </ContentInner>
             }),
@@ -141,12 +182,22 @@ pub fn Content(selected_tab: RwSignal<String>) -> impl IntoView {
             }),
             INPUTS => EitherOf4::C(view! {
                 <ContentInner>
-                    <InputTab available_items_signal=available_items item_costs=item_costs />
+                    <InputTab
+                        available_items_signal=available_items
+                        amount_signals=amount_signals
+                        cost_signals=cost_signals
+                        input_enabled=input_enabled
+                    />
                 </ContentInner>
             }),
             OUTPUTS => EitherOf4::D(view! {
                 <ContentInner>
-                    <OutputsTab targets_signal=targets />
+                    <OutputsTab
+                        targets_signal=targets
+                        amount_signals=targets_amount_signals
+                        enabled_signals=output_enabled
+                        maximize_signals=output_maximized
+                    />
                 </ContentInner>
             }),
             _ => unreachable!(),

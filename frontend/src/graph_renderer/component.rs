@@ -11,16 +11,21 @@ use solver::{
 
 use solver::graph::Graph as SolvedGraph;
 
-use crate::{graph_renderer::SerializableGraph, item::AmountState, recipes::Recipes};
+use crate::{graph_renderer::SerializableGraph, item::Items, recipes::Recipes};
 
 #[component]
 pub fn GraphVisualizer(
     selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>,
-    available_items: RwSignal<Vec<(ItemId, AmountState)>>,
-    targets: RwSignal<Vec<(ItemId, AmountState)>>,
-    item_cost: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>,
+    targets: RwSignal<Vec<ItemId>>,
+    availables_amount_signals: Arc<BTreeMap<ItemId, RwSignal<f64>>>,
+    cost_signals: Arc<BTreeMap<ItemId, RwSignal<f64>>>,
+    target_signals: Arc<BTreeMap<ItemId, RwSignal<f64>>>,
+    output_maximized: Arc<BTreeMap<ItemId, RwSignal<bool>>>,
+    input_enabled: Arc<BTreeMap<ItemId, RwSignal<bool>>>,
+    output_enabled: Arc<BTreeMap<ItemId, RwSignal<bool>>>,
 ) -> impl IntoView {
     let recipes = expect_context::<Recipes>();
+    let items = expect_context::<Items>();
 
     let graph = Memo::new(move |_| {
         let mut solver_recipes = BTreeMap::new();
@@ -30,45 +35,34 @@ pub fn GraphVisualizer(
                 solver_recipes.insert(*rid, r.inner.clone());
             }
         }
-        let availables = available_items.with(|available_items| {
-            let mut availables = BTreeMap::new();
-            for (iid, qty) in available_items {
-                if let AmountState::Some(qty) = *qty {
-                    availables.insert(*iid, qty);
-                }
-            }
-            availables
-        });
+
+        let availables = items
+            .items
+            .keys()
+            .filter_map(|iid| {
+                let amount = availables_amount_signals.get(iid).unwrap().get();
+                let enabled = input_enabled.get(iid).unwrap().get();
+
+                enabled.then_some((*iid, amount))
+            })
+            .collect::<BTreeMap<_, _>>();
 
         let solve_for = targets.with(|targets| {
-            let mut solve_for = Vec::new();
-            for (iid, qty) in targets {
-                let target_qty = match *qty {
-                    AmountState::Maximize(_) => None,
-                    AmountState::Some(qty) => Some(qty),
-                    _ => continue,
-                };
-                solve_for.push(Target {
-                    iid: *iid,
-                    qty: target_qty,
-                });
-            }
-            solve_for
+            targets
+                .iter()
+                .filter_map(|iid| {
+                    let amount = target_signals.get(iid).unwrap().get();
+                    let maximize = output_maximized.get(iid).unwrap().get();
+                    let enabled = output_enabled.get(iid).unwrap().get();
+                    let qty = (!maximize).then_some(amount);
+                    (enabled && (maximize || amount > 0.0)).then_some(Target { iid: *iid, qty })
+                })
+                .collect::<Vec<_>>()
         });
 
-        let item_cost = item_cost
+        let item_cost = cost_signals
             .iter()
-            .map(|(iid, cost)| {
-                let cost = match cost.get() {
-                    AmountState::Some(qty)
-                    | AmountState::Disabled(qty)
-                    | AmountState::Maximize(qty)
-                    | AmountState::MaximizeDisabled(qty) => qty,
-                    AmountState::EnabledZero | AmountState::DisabledZero => 0.0,
-                    AmountState::None => 1.0,
-                };
-                (*iid, cost)
-            })
+            .map(|(iid, cost)| (*iid, cost.get()))
             .collect();
 
         leptos::logging::log!("{:?}", solve_for);
