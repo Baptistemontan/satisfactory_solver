@@ -21,6 +21,17 @@ pub const BASE_URL: &str = const {
     }
 };
 
+include!(concat!(env!("OUT_DIR"), "/i18n/mod.rs"));
+use i18n::I18nContextProvider;
+
+macro_rules! t_s {
+    ($($tt:tt)*) => {
+        leptos::prelude::Signal::derive(move || $crate::i18n::t_string!($($tt)*).to_string())
+    };
+}
+
+pub(crate) use t_s;
+
 #[component]
 pub fn App() -> impl IntoView {
     let (recipes, items, buildings) = parser::parse(std::io::Cursor::new(DATA)).unwrap();
@@ -72,8 +83,10 @@ pub fn App() -> impl IntoView {
     let theme = RwSignal::new(Theme::dark());
 
     view! {
-        <ConfigProvider theme=theme class="thaw-provider">
-            <Layout theme=theme />
-        </ConfigProvider>
+        <I18nContextProvider>
+            <ConfigProvider theme=theme class="thaw-provider">
+                <Layout theme=theme />
+            </ConfigProvider>
+        </I18nContextProvider>
     }
 }

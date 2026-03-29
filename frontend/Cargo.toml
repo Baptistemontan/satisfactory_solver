@@ -18,3 +18,8 @@ thaw = { workspace = true }
 float_eq = { workspace = true }
 yoke = { workspace = true }
 icondata = { workspace = true }
+leptos-use = { workspace = true }
+leptos_i18n = { workspace = true }
+
+[build-dependencies]
+leptos_i18n_build = { workspace = true }

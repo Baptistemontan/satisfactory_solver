@@ -5,7 +5,8 @@ use std::{
 
 use solver::recipe::ItemId;
 
-use crate::BASE_URL;
+use crate::i18n::*;
+use crate::{BASE_URL, t_s};
 use leptos::{either::Either, prelude::*};
 use thaw::{BackTop, Button, Checkbox, Divider, Input, Scrollbar, SpinButton, Switch, Tooltip};
 
@@ -46,6 +47,8 @@ pub fn InputTab(
     available_items_signal: RwSignal<Vec<(ItemId, AmountState)>>,
     item_costs: Arc<BTreeMap<ItemId, RwSignal<AmountState>>>,
 ) -> impl IntoView {
+    let i18n = use_i18n();
+
     let items = expect_context::<Items>();
     let available_items = available_items_signal.read_untracked();
     let available_items = available_items
@@ -189,10 +192,10 @@ pub fn InputTab(
                         Either::Right(view! {
                             <div class="input-ressources-selection">
                                 <div class="input-ressources-selection-header">
-                                    <span>"Ressources"</span>
+                                    <span>{t!(i18n, ressources.ressources)}</span>
                                     <div class="input-ressources-selection-toggles">
-                                        <Button on_click=set_ressources_to_zero disabled=cost_input>"Set to 0"</Button>
-                                        <Button on_click=set_ressources_to_max disabled=cost_input>"Set to max"</Button>
+                                        <Button on_click=set_ressources_to_zero disabled=cost_input>{t!(i18n, ressources.set_to_zero)}</Button>
+                                        <Button on_click=set_ressources_to_max disabled=cost_input>{t!(i18n, ressources.set_to_max)}</Button>
                                     </div>
                                 </div>
                                 <Divider />
@@ -207,11 +210,11 @@ pub fn InputTab(
             </div>
             <div class="input-custom-selection">
                 <div class="input-ressources-selection-header">
-                    <span>"Inputs"</span>
+                    <span>{t!(i18n, inputs.inputs)}</span>
                     <div class="input-ressources-selection-toggles">
                         // <ItemSelector selected_items={selected_items.clone()} />
-                        <Switch checked=item_cost_input label="Edit Costs"  />
-                        <Switch checked=input_selection label="Edit Inputs"  />
+                        <Switch checked=item_cost_input label={t_s!(i18n, inputs.edit_costs)}  />
+                        <Switch checked=input_selection label={t_s!(i18n, inputs.edit_inputs)}  />
                     </div>
                 </div>
                 <Divider />
@@ -231,6 +234,7 @@ pub fn InputTab(
 
 #[component]
 pub fn OutputsTab(targets_signal: RwSignal<Vec<(ItemId, AmountState)>>) -> impl IntoView {
+    let i18n = use_i18n();
     let items = expect_context::<Items>();
     let targets = targets_signal.read_untracked();
     let targets = targets
@@ -303,7 +307,7 @@ pub fn OutputsTab(targets_signal: RwSignal<Vec<(ItemId, AmountState)>>) -> impl 
             </div>
             <div class="input-custom-selection">
                 <div class="input-ressources-selection-header">
-                    <span>"Outputs"</span>
+                    <span>{t!(i18n, outputs.outputs)}</span>
                     <div class="input-ressources-selection-toggles">
                         // <ItemSelector selected_items={selected_items.clone()} />
                         // <Switch checked=input_selection label="Edit Inputs"  />
@@ -346,6 +350,7 @@ pub fn OutputsTab(targets_signal: RwSignal<Vec<(ItemId, AmountState)>>) -> impl 
 
 #[component]
 fn ItemList(selected_items: Arc<BTreeMap<ItemId, RwSignal<bool>>>) -> impl IntoView {
+    let i18n = use_i18n();
     let items = expect_context::<Items>();
     let search_value = RwSignal::new(String::new());
 
@@ -381,7 +386,7 @@ fn ItemList(selected_items: Arc<BTreeMap<ItemId, RwSignal<bool>>>) -> impl IntoV
     view! {
         <div class="item-picking-list">
             <div class="item-list-header">
-                <Input value=search_value placeholder="search" />
+                <Input value=search_value placeholder={t_s!(i18n, search)} />
             </div>
             <Divider />
             <Scrollbar>
@@ -456,6 +461,7 @@ fn ItemAmountInput(
     selected: Option<Arc<BTreeMap<ItemId, RwSignal<bool>>>>,
     maximize: bool,
 ) -> impl IntoView {
+    let i18n = use_i18n();
     let reset_ressources_sig = use_context::<RessourcesResetProvider>();
     let items = expect_context::<Items>();
     let item = items.items.get(&item_id).unwrap();
@@ -490,7 +496,7 @@ fn ItemAmountInput(
 
     let maximize_button = bool::then(maximize, move || {
         view! {
-            <Tooltip content="Maximize" >
+            <Tooltip content={t_s!(i18n, inputs.maximize)}>
                 <Checkbox checked=maximize_status/>
             </Tooltip>
         }

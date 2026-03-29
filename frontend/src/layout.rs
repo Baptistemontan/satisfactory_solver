@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use crate::i18n::*;
 use crate::item::{AmountState, InputTab, Items, OutputsTab};
 use crate::recipes::RecipeTab;
 use crate::{graph_renderer::component::GraphVisualizer, recipes::Recipes};
@@ -36,28 +37,29 @@ pub fn Footer() -> impl IntoView {
 
 #[component]
 pub fn Header(selected_tab: RwSignal<String>, theme: RwSignal<Theme>) -> impl IntoView {
+    let i18n = use_i18n();
     view! {
         <div class="header">
             <TabList selected_value=selected_tab>
                 <Tab value=PRODUCTION>
-                    "Production"
+                    {t!(i18n, tabs.production)}
                 </Tab>
                 <Tab value=INPUTS>
-                    "Inputs"
+                    {t!(i18n, tabs.inputs)}
                 </Tab>
                 <Tab value=OUTPUTS>
-                    "Outputs"
+                    {t!(i18n, tabs.outputs)}
                 </Tab>
                 <Tab value=RECIPES>
-                    "Recipes"
+                    {t!(i18n, tabs.recipes)}
                 </Tab>
             </TabList>
             <div class="selectors">
                 <div class="selector">
-                    <Button on_click=move |_| theme.set(Theme::light())>"Light"</Button>
+                    <Button on_click=move |_| theme.set(Theme::light())>{t!(i18n, theme.light)}</Button>
                 </div>
                 <div class="selector">
-                    <Button on_click=move |_| theme.set(Theme::dark())>"Dark"</Button>
+                    <Button on_click=move |_| theme.set(Theme::dark())>{t!(i18n, theme.dark)}</Button>
                 </div>
             </div>
         </div>

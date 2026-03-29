@@ -10,7 +10,9 @@ use thaw::{BackTop, Button, Checkbox, Divider, Input, Scrollbar, Tooltip};
 
 use crate::{
     BASE_URL,
+    i18n::use_i18n,
     item::{Item, Items},
+    t_s,
 };
 #[derive(Debug)]
 pub struct Recipe {
@@ -82,6 +84,7 @@ pub fn RecipeList(
     selected_recipes: Arc<BTreeMap<RecipeId, RwSignal<bool>>>,
     recipes: Arc<BTreeMap<RecipeId, Arc<Recipe>>>,
 ) -> impl IntoView {
+    let i18n = use_i18n();
     let search_value = RwSignal::new(String::new());
     let recipes_to_display: RwSignal<BTreeMap<_, _>> = RwSignal::new(Default::default());
     let mut search_helper = recipes
@@ -146,13 +149,13 @@ pub fn RecipeList(
     view! {
         <div class="recipe-list">
             <div class="recipe-list-header">
-                <Input value=search_value placeholder="search" />
+                <Input value=search_value placeholder={t_s!(i18n, search)} />
                 <div class="recipe-list-toggles">
                     <div class="recipe-list-toggle">
-                        <Button on_click=on_toggle_all>"All"</Button>
+                        <Button on_click=on_toggle_all>{t_s!(i18n, recipes.all)}</Button>
                     </div>
                     <div class="recipe-list-toggle">
-                        <Button on_click=on_toggle_none>"None"</Button>
+                        <Button on_click=on_toggle_none>{t_s!(i18n, recipes.none)}</Button>
                     </div>
                 </div>
             </div>

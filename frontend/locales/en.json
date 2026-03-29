@@ -1,0 +1,31 @@
+{
+  "ressources": {
+    "ressources": "Ressources",
+    "set_to_zero": "Set to 0",
+    "set_to_max": "Set to max"
+  },
+  "inputs": {
+    "inputs": "Inputs",
+    "edit_costs": "Edit Costs",
+    "edit_inputs": "Edit Inputs",
+    "maximize": "Maximize"
+  },
+  "outputs": {
+    "outputs": "Outputs"
+  },
+  "search": "Search",
+  "recipes": {
+    "all": "All",
+    "none": "None"
+  },
+  "tabs": {
+    "production": "Production",
+    "inputs": "Inputs",
+    "outputs": "Outputs",
+    "recipes": "Recipes"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark"
+  }
+}
