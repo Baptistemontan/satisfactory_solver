@@ -678,7 +678,7 @@ fn ItemAmountInput(
         let grabbable = move || drag_idx.get().is_none();
         let view = view! {
             <div on:mousedown=on_click class="item-amount-input-grab-icon" class=("item-amount-input-draggable", grabbable)>
-                <Icon icon=icondata::BsChevronBarExpand />
+                <Icon icon=icondata::BsArrowDownUp />
             </div>
         };
         Some(view)
