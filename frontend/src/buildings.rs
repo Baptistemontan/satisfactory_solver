@@ -3,14 +3,16 @@ use std::{
     sync::Arc,
 };
 
-use solver::recipe::{BuildingId, RecipeId};
+use solver::recipe::{Building as BuildingInner, BuildingId, RecipeId};
 
 #[derive(Debug)]
 pub struct Building {
     pub id: BuildingId,
+    pub slug: Arc<str>,
     pub name: Arc<str>,
     pub icon: Arc<str>,
     pub description: Arc<str>,
+    pub inner: Arc<BuildingInner>,
 }
 
 #[derive(Debug, Clone)]

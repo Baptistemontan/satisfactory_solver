@@ -19,6 +19,17 @@ pub struct Recipe {
     pub building: BuildingId,
 }
 
+#[derive(Debug, Clone)]
+pub enum PowerData {
+    Usage {},
+    Production { power_production: f64 },
+}
+
+#[derive(Debug, Clone)]
+pub struct Building {
+    pub power: PowerData,
+}
+
 impl Recipe {
     pub fn add_to_fast_solve(
         &self,

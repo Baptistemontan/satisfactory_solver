@@ -9,13 +9,54 @@ use serde::{
     Deserialize,
     de::{DeserializeOwned, DeserializeSeed, IgnoredAny, Visitor},
 };
-use solver::recipe::{BuildingId, ItemId, Recipe as SolverRecipe, RecipeId};
+use solver::recipe::{
+    Building as SolverBuilding, BuildingId, ItemId, PowerData, Recipe as SolverRecipe, RecipeId,
+};
 
 use crate::{
     buildings::{Building, Buildings},
     item::{Item, Items},
     recipes::{Recipe, Recipes},
 };
+
+trait Id: Copy + Ord {
+    fn from_usize(id: usize) -> Self;
+}
+
+macro_rules! impl_id {
+    ($id: ty) => {
+        impl Id for $id {
+            fn from_usize(id: usize) -> Self {
+                Self(id)
+            }
+        }
+    };
+}
+
+impl_id!(ItemId);
+// impl_id!(RecipeId);
+impl_id!(BuildingId);
+
+struct Generator {
+    building: BuildingId,
+    fuels: BTreeSet<ItemId>,
+    power_production: f64,
+    water_usage: Option<f64>,
+}
+
+fn get_generator_outputs(
+    fuel: &Item,
+    item_slug: &BTreeMap<Arc<str>, ItemId>,
+) -> BTreeMap<ItemId, f64> {
+    let (waste_slug, waste_qty) = match &*fuel.slug {
+        "uranium-fuel-rod" => ("uranium-waste", 50.0),
+        "plutonium-fuel-rod" => ("plutonium-waste", 10.0),
+        _ => return BTreeMap::new(),
+    };
+
+    let waste_iid = item_slug.get(waste_slug).copied().unwrap();
+    BTreeMap::from([(waste_iid, waste_qty)])
+}
 
 pub fn parse<R>(reader: R) -> serde_json::error::Result<(Recipes, Items, Buildings)>
 where
@@ -25,27 +66,68 @@ where
     let mut main_seed = MainSeed::default();
     DeserializeSeed::deserialize(&mut main_seed, &mut de)?;
     let mut building_recipes: BTreeMap<BuildingId, Arc<BTreeSet<RecipeId>>> = BTreeMap::new();
+
+    let item_slug_search = main_seed
+        .items
+        .iter()
+        .map(|(iid, item)| (item.slug.clone(), *iid))
+        .collect::<BTreeMap<_, _>>();
+
+    let water_iid = item_slug_search.get("water").copied().unwrap();
+
+    for generator in &main_seed.generators {
+        for fuel in &generator.fuels {
+            let recipe_id = RecipeId(main_seed.recipe_id);
+            main_seed.recipe_id += 1;
+
+            let fuel_item = main_seed.items.get(fuel).unwrap();
+            let time = fuel_item.energy_value / generator.power_production;
+            let building = main_seed.buildings.get(&generator.building).unwrap();
+
+            let recipe_name = format!("{} in {}", fuel_item.name, building.name);
+
+            let outputs = get_generator_outputs(fuel_item, &item_slug_search);
+
+            let mut inputs = BTreeMap::from([(*fuel, 1.0)]);
+            if let Some(water_usage) = generator.water_usage {
+                let amount = time * water_usage;
+                inputs.insert(water_iid, amount);
+            }
+
+            let recipe = Recipe {
+                id: recipe_id,
+                name: Arc::from(recipe_name.as_str()),
+                alternate: false,
+                inner: Arc::new(SolverRecipe {
+                    inputs,
+                    outputs,
+                    time,
+                    building: generator.building,
+                }),
+            };
+
+            main_seed.recipes.insert(recipe_id, Arc::new(recipe));
+        }
+    }
+
     for recipe in main_seed.recipes.values() {
         let recipes = building_recipes.entry(recipe.inner.building).or_default();
         let recipes = Arc::get_mut(recipes).unwrap();
         recipes.insert(recipe.id);
     }
 
-    let slug_search = main_seed
-        .items
-        .iter()
-        .map(|(iid, item)| (item.slug.clone(), *iid))
-        .collect::<BTreeMap<_, _>>();
-
     let recipes = Arc::new(main_seed.recipes);
     let items = Arc::new(main_seed.items);
     let buildings = Arc::new(main_seed.buildings);
     let building_recipes = Arc::new(building_recipes);
-    let slug_search = Arc::new(slug_search);
+    let item_slug_search = Arc::new(item_slug_search);
 
     Ok((
         Recipes { recipes },
-        Items { items, slug_search },
+        Items {
+            items,
+            slug_search: item_slug_search,
+        },
         Buildings {
             buildings,
             recipes: building_recipes,
@@ -64,6 +146,7 @@ struct MainSeed {
     recipe_id: usize,
     item_id: usize,
     building_id: usize,
+    generators: Vec<Generator>,
 }
 
 impl<'de> DeserializeSeed<'de> for &'_ mut MainSeed {
@@ -102,6 +185,9 @@ impl<'de> Visitor<'de> for &'_ mut MainSeed {
                 MainFields::Recipes => map.next_value_seed(RecipesSeed { main_seed: self })?,
                 MainFields::Buildings => map.next_value_seed(BuildingsSeed { main_seed: self })?,
                 MainFields::Resources => map.next_value_seed(RessourcesSeed { main_seed: self })?,
+                MainFields::Generators => {
+                    map.next_value_seed(GeneratorsSeed { main_seed: self })?
+                }
                 _ => {
                     // TODO
                     map.next_value::<IgnoredAny>()?;
@@ -139,17 +225,10 @@ impl<'de> Visitor<'de> for ItemsSeed<'_> {
     where
         A: serde::de::MapAccess<'de>,
     {
-        while let Some(item_classname) = map.next_key::<Rc<str>>()? {
-            let item_id = match self.main_seed.item_queue.get(&*item_classname) {
-                Some(iid) => *iid,
-                None => {
-                    let item_id = ItemId(self.main_seed.item_id);
-                    self.main_seed.item_id += 1;
-                    self.main_seed.item_queue.insert(item_classname, item_id);
-                    item_id
-                }
-            };
-
+        while let Some(item_id) = map.next_key_seed(IdSeed::<_> {
+            queue: &mut self.main_seed.item_queue,
+            counter: &mut self.main_seed.item_id,
+        })? {
             let seed = ItemSeed {
                 main_seed: self.main_seed,
                 iid: item_id,
@@ -221,6 +300,7 @@ impl<'de> Visitor<'de> for ItemSeed<'_> {
         let mut name = None;
         let mut icon = None;
         let mut slug = None;
+        let mut energy_value = None;
         while let Some(field) = map.next_key::<ItemField>()? {
             match field {
                 ItemField::Description => deserialize_and_set(&mut description, &mut map)?,
@@ -229,6 +309,7 @@ impl<'de> Visitor<'de> for ItemSeed<'_> {
                 ItemField::Name => deserialize_and_set(&mut name, &mut map)?,
                 ItemField::Icon => deserialize_and_set(&mut icon, &mut map)?,
                 ItemField::Slug => deserialize_and_set(&mut slug, &mut map)?,
+                ItemField::EnergyValue => deserialize_and_set(&mut energy_value, &mut map)?,
                 _ => {
                     // TODO
                     map.next_value::<IgnoredAny>()?;
@@ -253,11 +334,83 @@ impl<'de> Visitor<'de> for ItemSeed<'_> {
             description: description.unwrap(),
             sink_points: sink_points.unwrap(),
             liquid: liquid.unwrap(),
+            energy_value: energy_value.unwrap(),
         })
     }
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(formatter, "a satisfactory item data")
+    }
+}
+
+struct IdSeed<'a, I, const WITH_CLASS: bool = false> {
+    queue: &'a mut BTreeMap<Rc<str>, I>,
+    counter: &'a mut usize,
+}
+
+impl<'de, I: Id> DeserializeSeed<'de> for IdSeed<'_, I> {
+    type Value = I;
+
+    fn deserialize<D>(mut self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        DeserializeSeed::deserialize(&mut self, deserializer)
+    }
+}
+
+impl<'de, I: Id> DeserializeSeed<'de> for &'_ mut IdSeed<'_, I> {
+    type Value = I;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let class_name: Rc<str> = Deserialize::deserialize(deserializer)?;
+        let id = match self.queue.get(&class_name) {
+            Some(id) => *id,
+            None => {
+                let id = Id::from_usize(*self.counter);
+                *self.counter += 1;
+                self.queue.insert(class_name, id);
+                id
+            }
+        };
+
+        Ok(id)
+    }
+}
+
+impl<'de, I: Id> DeserializeSeed<'de> for IdSeed<'_, I, true> {
+    type Value = (I, Rc<str>);
+
+    fn deserialize<D>(mut self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        DeserializeSeed::deserialize(&mut self, deserializer)
+    }
+}
+
+impl<'de, I: Id> DeserializeSeed<'de> for &'_ mut IdSeed<'_, I, true> {
+    type Value = (I, Rc<str>);
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let class_name: Rc<str> = Deserialize::deserialize(deserializer)?;
+        let id = match self.queue.get(&class_name) {
+            Some(id) => *id,
+            None => {
+                let id = Id::from_usize(*self.counter);
+                *self.counter += 1;
+                self.queue.insert(class_name.clone(), id);
+                id
+            }
+        };
+
+        Ok((id, class_name))
     }
 }
 
@@ -369,22 +522,14 @@ impl<'de> Visitor<'de> for RecipeSeed<'_> {
                     outputs = Some(io);
                 }
                 RecipeField::ProducedIn => {
-                    // TODO: skip vec step
-                    let mut produced_in = map.next_value::<Vec<Rc<str>>>()?;
+                    let produced_in = map.next_value_seed(IdListSeed {
+                        id_seed: IdSeed {
+                            queue: &mut self.main_seed.building_queue,
+                            counter: &mut self.main_seed.building_id,
+                        },
+                    })?;
 
-                    if let Some(bulding_name) = produced_in.pop() {
-                        if let Some(building_id) = self.main_seed.building_queue.get(&*bulding_name)
-                        {
-                            building = Some(*building_id);
-                        } else {
-                            let building_id = BuildingId(self.main_seed.building_id);
-                            self.main_seed.building_id += 1;
-                            self.main_seed
-                                .building_queue
-                                .insert(bulding_name, building_id);
-                            building = Some(building_id);
-                        }
-                    }
+                    building = produced_in.iter().copied().next();
                 }
                 RecipeField::InMachine => {
                     let in_machine = map.next_value::<bool>()?;
@@ -540,19 +685,10 @@ impl<'de> Visitor<'de> for BuildingsSeed<'_> {
     where
         A: serde::de::MapAccess<'de>,
     {
-        while let Some(building_classname) = map.next_key::<Rc<str>>()? {
-            let building_id = match self.main_seed.building_queue.get(&*building_classname) {
-                Some(bid) => *bid,
-                None => {
-                    let building_id = BuildingId(self.main_seed.building_id);
-                    self.main_seed.building_id += 1;
-                    self.main_seed
-                        .building_queue
-                        .insert(building_classname, building_id);
-                    building_id
-                }
-            };
-
+        while let Some(building_id) = map.next_key_seed(IdSeed::<_> {
+            queue: &mut self.main_seed.building_queue,
+            counter: &mut self.main_seed.building_id,
+        })? {
             let mut building = map.next_value::<Building>()?;
             building.id = building_id;
 
@@ -603,11 +739,13 @@ impl<'de> Visitor<'de> for BuildingVisitor {
         let mut description = None;
         let mut name = None;
         let mut icon = None;
+        let mut slug = None;
         while let Some(field) = map.next_key::<BuildingField>()? {
             match field {
                 BuildingField::Description => deserialize_and_set(&mut description, &mut map)?,
                 BuildingField::Name => deserialize_and_set(&mut name, &mut map)?,
                 BuildingField::Icon => deserialize_and_set(&mut icon, &mut map)?,
+                BuildingField::Slug => deserialize_and_set(&mut slug, &mut map)?,
                 _ => {
                     // TODO
                     map.next_value::<IgnoredAny>()?;
@@ -618,8 +756,12 @@ impl<'de> Visitor<'de> for BuildingVisitor {
         // TODO: don't unwrap here
         Ok(Building {
             id: BuildingId(usize::MAX),
+            slug: slug.unwrap(),
             icon: icon.unwrap(),
             name: name.unwrap(),
+            inner: Arc::new(SolverBuilding {
+                power: PowerData::Usage {},
+            }),
             description: description.unwrap(),
         })
     }
@@ -694,5 +836,161 @@ fn get_ress_amount_for(ress: &str) -> Option<f64> {
         "Desc_OreUranium_C" => Some(2100.0),
         "Desc_LiquidOil_C" => Some(12600.0),
         _ => None,
+    }
+}
+
+struct GeneratorsSeed<'a> {
+    main_seed: &'a mut MainSeed,
+}
+
+impl<'de> DeserializeSeed<'de> for GeneratorsSeed<'_> {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_map(self)
+    }
+}
+
+impl<'de> Visitor<'de> for GeneratorsSeed<'_> {
+    type Value = ();
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "a map")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        while let Some((building_id, building_class)) = map.next_key_seed(IdSeed::<_, true> {
+            queue: &mut self.main_seed.building_queue,
+            counter: &mut self.main_seed.building_id,
+        })? {
+            let water_usage = get_generator_water_usage(&building_class);
+            let generator = map.next_value_seed(GeneratorSeed {
+                main_seed: self.main_seed,
+                bid: building_id,
+                water_usage,
+            })?;
+            self.main_seed.generators.push(generator);
+        }
+
+        Ok(())
+    }
+}
+
+fn get_generator_water_usage(generator: &str) -> Option<f64> {
+    match generator {
+        "Desc_GeneratorCoal_C" => Some(45.0),
+        "Desc_GeneratorNuclear_C" => Some(240.0),
+        _ => None,
+    }
+}
+
+struct GeneratorSeed<'a> {
+    main_seed: &'a mut MainSeed,
+    bid: BuildingId,
+    water_usage: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(field_identifier, rename_all = "camelCase")]
+enum GeneratorField {
+    ClassName,
+    Fuel,
+    PowerProduction,
+    PowerProductionExponent,
+    WaterToPowerRatio,
+}
+
+impl<'de> DeserializeSeed<'de> for GeneratorSeed<'_> {
+    type Value = Generator;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_map(self)
+    }
+}
+
+impl<'de> Visitor<'de> for GeneratorSeed<'_> {
+    type Value = Generator;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "a map")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        let mut fuels = None;
+        let mut power_production = None;
+        while let Some(gen_field) = map.next_key::<GeneratorField>()? {
+            match gen_field {
+                GeneratorField::Fuel => {
+                    let fuels_items = map.next_value_seed(IdListSeed {
+                        id_seed: IdSeed {
+                            queue: &mut self.main_seed.item_queue,
+                            counter: &mut self.main_seed.item_id,
+                        },
+                    })?;
+                    fuels = Some(fuels_items);
+                }
+                GeneratorField::PowerProduction => {
+                    deserialize_and_set(&mut power_production, &mut map)?
+                }
+                _ => {
+                    // TODO
+                    map.next_value::<IgnoredAny>()?;
+                }
+            }
+        }
+
+        Ok(Generator {
+            fuels: fuels.unwrap(),
+            power_production: power_production.unwrap(),
+            building: self.bid,
+            water_usage: self.water_usage,
+        })
+    }
+}
+
+struct IdListSeed<'a, I> {
+    id_seed: IdSeed<'a, I>,
+}
+
+impl<'de, I: Id> DeserializeSeed<'de> for IdListSeed<'_, I> {
+    type Value = BTreeSet<I>;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(self)
+    }
+}
+
+impl<'de, I: Id> Visitor<'de> for IdListSeed<'_, I> {
+    type Value = BTreeSet<I>;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "a sequence of items")
+    }
+
+    fn visit_seq<A>(mut self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::SeqAccess<'de>,
+    {
+        let mut ids = BTreeSet::new();
+        while let Some(id) = seq.next_element_seed(&mut self.id_seed)? {
+            ids.insert(id);
+        }
+
+        Ok(ids)
     }
 }

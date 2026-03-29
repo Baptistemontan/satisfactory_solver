@@ -22,41 +22,14 @@ pub struct Item {
     pub ressource: Option<f64>,
     pub description: Arc<str>,
     pub sink_points: f64,
+    pub energy_value: f64,
     pub liquid: bool,
 }
-
-// #[derive(Debug, Clone, Copy, Default)]
-// pub enum AmountState {
-//     #[default]
-//     Unselected,
-//     Enabled(f64),
-//     Disabled(f64),
-//     EnabledDefault,
-//     DisabledDefault,
-//     Maximize(f64),
-//     MaximizeDisabled(f64),
-// }
 
 #[derive(Debug, Clone)]
 pub struct Items {
     pub items: Arc<BTreeMap<ItemId, Arc<Item>>>,
     pub slug_search: Arc<BTreeMap<Arc<str>, ItemId>>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct RessourcesResetProvider(ReadSignal<Option<bool>>);
-
-fn iter_signals<'a, K, T>(
-    iter: impl IntoIterator<Item = &'a K>,
-    signals: &BTreeMap<K, RwSignal<T>>,
-) -> impl Iterator<Item = (K, RwSignal<T>)>
-where
-    K: Ord + Copy + 'a,
-{
-    IntoIterator::into_iter(iter).filter_map(|iid| {
-        let sig = signals.get(iid)?;
-        Some((*iid, *sig))
-    })
 }
 
 #[component]
@@ -130,25 +103,6 @@ pub fn InputTab(
 
     let item_cost_input = RwSignal::new(false);
 
-    // let draggable_list = RwSignal::new(None);
-    // Effect::new(move |_| {
-    //     let Some((from, to)) = draggable_list.get() else {
-    //         return;
-    //     };
-    //     leptos::logging::log!("from {} to {}", from, to);
-    //     draggable_list.update_untracked(|v| *v = None);
-
-    //     for sig in [available_items_signal, item_cost_selection] {
-    //         let mut writer = sig.write();
-    //         leptos::logging::log!("from {:?}", &*writer);
-    //         let value = writer.remove(from);
-    //         writer.insert(to, value);
-    //         leptos::logging::log!("to {:?}", &*writer);
-    //     }
-    // });
-
-    let reset_signal = RwSignal::new(None);
-
     let ressources_default_amounts = items
         .items
         .iter()
@@ -186,8 +140,6 @@ pub fn InputTab(
             amount_signals.clone()
         }
     };
-
-    provide_context(RessourcesResetProvider(reset_signal.read_only()));
 
     view! {
         <div class="input-items-selection">
@@ -617,6 +569,8 @@ pub fn ItemsAmountInput(
     }
 }
 
+type MovableProps = Option<(RwSignal<Option<usize>>, RwSignal<Option<usize>>)>;
+
 #[component]
 fn ItemAmountInput(
     item_id: ItemId,
@@ -625,7 +579,7 @@ fn ItemAmountInput(
     maximize: Option<RwSignal<bool>>,
     enabled: RwSignal<bool>,
     #[prop(into)] idx: Signal<usize>,
-    movable: Option<(RwSignal<Option<usize>>, RwSignal<Option<usize>>)>,
+    movable: MovableProps,
 ) -> impl IntoView {
     // Drag icons:
     // AiMenuOutlined

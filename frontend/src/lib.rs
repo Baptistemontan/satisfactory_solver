@@ -4,7 +4,6 @@ mod buildings;
 mod graph_renderer;
 mod item;
 mod layout;
-mod miner;
 mod parser;
 mod recipes;
 mod utils;
